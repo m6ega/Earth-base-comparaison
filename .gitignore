@@ -218,3 +218,66 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Node.js / React tooling and generated output
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/install-state.gz
+.pnp.*
+.next/
+out/
+.vite/
+.parcel-cache/
+.eslintcache
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variants and local configuration (safe examples may be tracked)
+.env.*
+!.env.example
+!.env.*.example
+
+# Temporary files and operating-system metadata
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+tmp/
+temp/
+
+# DEM rasters and common planetary/elevation products: keep outside Git
+*.[tT][iI][fF]
+*.[tT][iI][fF][fF]
+*.[dD][eE][mM]
+*.[hH][gG][tT]
+*.[iI][mM][gG]
+*.[cC][uU][bB]
+*.[aA][sS][cC]
+*.[bB][iI][lL]
+*.[fF][lL][tT]
+*.[vV][rR][tT]
+*.aux.xml
+*.ovr
+
+# Local datasets, uploads and processing outputs
+/data/raw/
+/data/processed/
+/data/downloads/
+/data/reference/
+/data/references/
+uploads/
+/data/**/*.zip
+/data/**/*.gz
+/data/**/*.tar
+/data/**/*.7z
