@@ -8,7 +8,9 @@ Terra Analog is a NASA Space Apps Challenge 2026 project being prepared for the 
 
 [PROJECT-CONTEXT.md](PROJECT-CONTEXT.md) is the source of truth for project decisions. Users will upload one Earth DEM GeoTIFF, select a planet and a prepared planetary reference, and receive terrain similarity results. Global Earth scanning is outside scope.
 
-MVP terrain metrics are relative relief, slope distribution and surface roughness. Terrain morphology is deferred beyond the MVP. Earth aridity and lithology are optional enrichment: they do not affect the similarity score, and missing enrichment data does not block terrain analysis. Exact metric definitions and scoring remain open. Similar terrain does not establish environmental equivalence or mission suitability.
+MVP terrain metrics are relative relief, slope distribution and surface roughness. Each successful analysis returns a score from 0 to 1 for each metric, a `total_similarity` from 0 to 1, and any warnings. The 0–1 range is an API convention (`1.0` = maximum, `0.0` = minimum terrain similarity), not a scientifically validated calculation; the score formula, normalization and weights are not yet approved. Scores describe geometric terrain similarity only. They do not indicate habitability, base suitability, environmental equivalence or mission suitability.
+
+Terrain morphology is deferred beyond the MVP. Earth aridity and lithology are deferred optional features that are not approved for the MVP and require separate approval.
 
 ## Planned technology stack
 
@@ -19,7 +21,7 @@ MVP terrain metrics are relative relief, slope distribution and surface roughnes
 | Raster processing | Rasterio | DEM preprocessing and resolution harmonization |
 | Numerical analysis | NumPy and SciPy | Terrain feature extraction and calculations |
 
-Versions, frontend tooling, deployment, and runtime requirements are not yet selected. The confirmed analysis endpoint is `POST /analyze` with fields `file`, `planet` and `reference_id`; the remaining contract details are a draft.
+Versions, frontend tooling, deployment, and runtime requirements are not yet selected. The confirmed analysis endpoint is `POST /analyze` with fields `file`, `planet` and `reference_id`. Approved mock responses are in [data/examples/](data/examples/).
 
 ## Repository structure
 
@@ -28,7 +30,11 @@ Versions, frontend tooling, deployment, and runtime requirements are not yet sel
 ├── .github/pull_request_template.md
 ├── backend/README.md
 ├── frontend/README.md
-├── data/README.md
+├── data/
+│   ├── README.md
+│   └── examples/
+│       ├── analyze-success.json
+│       └── analyze-error.json
 ├── docs/
 │   ├── architecture.md
 │   ├── api-contract.md
@@ -52,8 +58,8 @@ The backend and frontend directories contain planning documentation only.
 - [Backend plan](backend/README.md) and [frontend plan](frontend/README.md): ownership and development checklists.
 - [Data plan](data/README.md): provenance, reference preparation and storage.
 - [Architecture](docs/architecture.md): boundaries and processing flow.
-- [API contract](docs/api-contract.md): approved request fields, proposed responses and unresolved questions.
-- [Methodology](docs/methodology.md): MVP metrics, optional enrichment, comparison and validation.
+- [API contract](docs/api-contract.md): approved request fields, MVP mock responses and unresolved questions.
+- [Methodology](docs/methodology.md): MVP metrics, score convention, deferred features and validation.
 
 Documentation labels approved decisions separately from proposals and open questions. Proposals require team agreement before implementation.
 

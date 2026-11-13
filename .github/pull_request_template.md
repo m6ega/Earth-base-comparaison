@@ -23,7 +23,9 @@ Describe interface changes, processing assumptions, dataset provenance or attrib
 - [ ] Changes follow PROJECT-CONTEXT.md and remain within the requested scope.
 - [ ] No application implementation is introduced before November 14, 2026.
 - [ ] `POST /analyze` fields remain `file`, `planet` and `reference_id`, or the change is agreed by both leads.
-- [ ] Similarity uses only the MVP terrain metrics; optional enrichment does not affect the score or block analysis.
+- [ ] Responses match the approved mock files in `data/examples/`; `total_similarity` and per-metric `scores` stay within 0–1.
+- [ ] Similarity uses only the three MVP terrain metrics and is described as geometric terrain similarity, not habitability or base suitability.
+- [ ] No aridity, lithology or other deferred feature is added without separate human approval.
 - [ ] Documentation and relevant links are updated.
 - [ ] No secrets, uploaded DEMs or large generated datasets are included.
 - [ ] Files were staged by explicit path, not with `git add .` or `git add -A`.

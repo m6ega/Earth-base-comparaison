@@ -6,7 +6,7 @@
 
 The Backend Lead owns processing, the API, and the validation, preparation, storage and integration of planetary reference data. The Frontend & Data Lead owns the interface, research of NASA reference data, and provenance documentation.
 
-Terrain similarity uses relative relief, slope distribution and surface roughness. Terrain morphology is deferred beyond the MVP. Earth aridity and lithology are optional enrichment, kept outside the similarity calculation; their absence must not block terrain analysis.
+Terrain similarity uses relative relief, slope distribution and surface roughness. A successful response always includes `total_similarity` and per-metric `scores` (0–1 API convention; formula not approved) plus `warnings`, matching the [approved mock responses](api-contract.md#mvp-mock-responses). Scores describe geometric terrain similarity only, not habitability or base suitability. Terrain morphology is deferred beyond the MVP. Earth aridity and lithology are deferred optional features, not approved for the MVP, and have no place in the MVP flow.
 
 Backend work happens on `backend--dev`, frontend work on `frontend--dev`, and reviewed integration on `main` through human-approved pull requests.
 
@@ -25,17 +25,15 @@ Preprocess Earth DEM; harmonize resolution
                          |
 Extract MVP terrain features (relief, slope, roughness)
                          |
-Calculate terrain similarity
+Calculate per-metric scores and total_similarity (0-1)
                          |
-Optional: attach Earth aridity/lithology if available
-(not used in the score; never blocks the response)
-                         |
-Return results, enrichment and warnings
+Return status, planet, reference, scores and warnings
+(or status "error" with error code and message)
                          |
 React: visualize results and explain errors/warnings
 ```
 
-This is a conceptual flow, not implemented behavior. Detailed response fields are [proposed](api-contract.md).
+This is a conceptual flow, not implemented behavior. Response fields are defined in the [API contract](api-contract.md).
 
 ## Proposed boundaries
 
@@ -49,6 +47,6 @@ Earth and planetary rasters are compared through terrain descriptors; they are n
 
 ## Unresolved decisions
 
-Deployment, runtime versions, authentication, how available references reach the frontend, reference storage, retention, processing limits, synchronous versus job-based execution, enrichment data sources and concurrency are undecided. No database, queue, cloud provider, additional endpoint or frontend build tool is mandated by this plan.
+Deployment, runtime versions, authentication, how available references reach the frontend, reference storage, retention, processing limits, synchronous versus job-based execution and concurrency are undecided. No database, queue, cloud provider, additional endpoint or frontend build tool is mandated by this plan.
 
 See [methodology](methodology.md), [data plan](../data/README.md), and [contribution rules](../CONTRIBUTING.md). Development begins November 14, 2026.
