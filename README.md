@@ -6,9 +6,9 @@ Terra Analog is a NASA Space Apps Challenge 2026 project being prepared for the 
 
 ## Project scope
 
-[PROJECT-CONTEXT.md](PROJECT-CONTEXT.md) is the source of truth for project decisions. Users will upload an Earth DEM, select a planetary reference region, and receive terrain similarity results. Global Earth scanning is outside scope.
+[PROJECT-CONTEXT.md](PROJECT-CONTEXT.md) is the source of truth for project decisions. Users will upload one Earth DEM GeoTIFF, select a planet and a prepared planetary reference, and receive terrain similarity results. Global Earth scanning is outside scope.
 
-Confirmed initial metrics are relative relief, slope distribution, surface roughness, and terrain morphology. Exact metric definitions and scoring remain open. Similar terrain does not establish environmental equivalence or mission suitability.
+MVP terrain metrics are relative relief, slope distribution and surface roughness. Terrain morphology is deferred beyond the MVP. Earth aridity and lithology are optional enrichment: they do not affect the similarity score, and missing enrichment data does not block terrain analysis. Exact metric definitions and scoring remain open. Similar terrain does not establish environmental equivalence or mission suitability.
 
 ## Planned technology stack
 
@@ -19,7 +19,7 @@ Confirmed initial metrics are relative relief, slope distribution, surface rough
 | Raster processing | Rasterio | DEM preprocessing and resolution harmonization |
 | Numerical analysis | NumPy and SciPy | Terrain feature extraction and calculations |
 
-Versions, frontend tooling, deployment, and runtime requirements are not yet selected. The confirmed analysis endpoint is `POST /analyze`; its detailed contract is a draft.
+Versions, frontend tooling, deployment, and runtime requirements are not yet selected. The confirmed analysis endpoint is `POST /analyze` with fields `file`, `planet` and `reference_id`; the remaining contract details are a draft.
 
 ## Repository structure
 
@@ -33,6 +33,8 @@ Versions, frontend tooling, deployment, and runtime requirements are not yet sel
 │   ├── architecture.md
 │   ├── api-contract.md
 │   └── methodology.md
+├── AGENTS.md
+├── CLAUDE.md
 ├── CONTRIBUTING.md
 ├── PROJECT-CONTEXT.md
 ├── README.md
@@ -46,13 +48,18 @@ The backend and frontend directories contain planning documentation only.
 
 - [Project context](PROJECT-CONTEXT.md): authoritative scope and responsibilities.
 - [Contributing and readiness checklist](CONTRIBUTING.md): preparation rules, branches and collaboration.
+- [Agent instructions](AGENTS.md) and [Claude Code notes](CLAUDE.md): rules for AI coding agents.
 - [Backend plan](backend/README.md) and [frontend plan](frontend/README.md): ownership and development checklists.
-- [Data plan](data/README.md): provenance, reference selection and storage.
+- [Data plan](data/README.md): provenance, reference preparation and storage.
 - [Architecture](docs/architecture.md): boundaries and processing flow.
-- [Draft API contract](docs/api-contract.md): proposed interface and unresolved questions.
-- [Methodology](docs/methodology.md): proposed metrics, comparison and validation.
+- [API contract](docs/api-contract.md): approved request fields, proposed responses and unresolved questions.
+- [Methodology](docs/methodology.md): MVP metrics, optional enrichment, comparison and validation.
 
-Documentation labels confirmed decisions separately from proposals and open questions. Proposals require team agreement before implementation.
+Documentation labels approved decisions separately from proposals and open questions. Proposals require team agreement before implementation.
+
+## Git workflow
+
+Backend work happens on `backend--dev` and frontend work on `frontend--dev`. Pull requests target `main`, and humans approve all merges. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
