@@ -32,7 +32,6 @@ No global Earth scanning.
 - Similarity calculations
 - Validation, preparation, storage and integration
   of planetary reference data
-- Optional enrichment handling
 - API responses
 
 ## Frontend Responsibilities
@@ -61,13 +60,16 @@ Terrain morphology was part of the initial metric list.
 It remains scientifically relevant but is not part of
 the MVP similarity score.
 
-## Optional Enrichment
+## Deferred Optional Features
 
-Earth aridity and lithology may be reported as
-optional context.
+Earth aridity and lithology are not approved for the MVP.
+They are deferred optional features that require
+separate approval.
 
-- They do not contribute to the terrain similarity score.
-- Missing enrichment data must not block terrain analysis.
+If approved later:
+
+- They must not contribute to the terrain similarity score.
+- Missing data for them must not block terrain analysis.
 
 ## API
 
@@ -76,6 +78,30 @@ POST /analyze
 Request fields: `file` (one Earth DEM GeoTIFF),
 `planet` (`mars` or `moon`), `reference_id`
 (selected prepared planetary reference).
+
+MVP response fields: `status`, `planet`,
+`reference` (`id`, `name`), `total_similarity`,
+`scores` (`relative_relief`, `slope_distribution`,
+`surface_roughness`) and `warnings`.
+Errors return `status` and `error` (`code`, `message`).
+
+Mock responses:
+data/examples/analyze-success.json and
+data/examples/analyze-error.json.
+
+`total_similarity` and the three `scores` are
+mandatory in every successful response.
+Scores use a 0–1 range as an MVP API convention,
+not an approved scientific formula; formula,
+normalization and weights are unresolved.
+1.0 represents maximum and 0.0 minimum terrain
+similarity (interface convention, not a
+scientifically validated calculation).
+`warnings` is always an array; the schema of
+non-empty warnings is unresolved.
+Scores measure geometric terrain similarity only,
+not habitability or base suitability.
+Mock values are illustrative only.
 
 See docs/api-contract.md.
 

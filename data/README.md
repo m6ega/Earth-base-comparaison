@@ -11,7 +11,9 @@ Responsibilities for planetary reference data:
 | Research NASA planetary DEM sources and document provenance | Frontend & Data Lead |
 | Validate, prepare, store and integrate the reference for analysis | Backend Lead |
 
-Earth aridity and lithology are optional enrichment. They do not contribute to the terrain similarity score, and missing enrichment data must not block terrain analysis.
+Earth aridity and lithology are deferred optional features, not approved for the MVP. No aridity or lithology dataset is approved; selecting one requires separate approval.
+
+[examples/](examples/) contains the approved MVP mock API responses, [analyze-success.json](examples/analyze-success.json) and [analyze-error.json](examples/analyze-error.json). Their values are illustrative and are not derived from any dataset. `mars-demo-01` is a placeholder identifier, not a selected reference.
 
 No specific source, region, product or dataset has been selected yet. No datasets have been downloaded or validated as part of repository preparation.
 
@@ -28,9 +30,6 @@ The Frontend & Data Lead records, for each planetary reference:
 - Download instructions sufficient to reproduce the source.
 
 The Backend Lead adds the validation result, preparation steps, checksum and storage location before the reference is used by `POST /analyze`.
-
-Optional enrichment sources (aridity, lithology) need the same provenance and usage-terms record before use.
-
 ## Proposed selection criteria
 
 Choose a small, documented reference set with reliable provenance, clear usage terms, known horizontal and vertical units, appropriate spatial extent, and sufficient valid elevation coverage. Compare effective resolution and terrain scale before treating datasets as comparable.
@@ -43,6 +42,6 @@ Small fixtures may be considered during development after checking licensing and
 
 ## Open questions
 
-Reference regions and NASA products, `reference_id` naming, minimum coverage, resolution targets, reference storage location, enrichment data sources, retention/deletion policy for uploads and storage budget remain undecided.
+Reference regions and NASA products, `reference_id` naming, minimum coverage, resolution targets, reference storage location, retention/deletion policy for uploads and storage budget remain undecided.
 
 See [methodology](../docs/methodology.md) and [API contract](../docs/api-contract.md).

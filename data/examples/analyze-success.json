@@ -1,0 +1,15 @@
+{
+  "status": "success",
+  "planet": "mars",
+  "reference": {
+    "id": "mars-demo-01",
+    "name": "Mars Demo Reference"
+  },
+  "total_similarity": 0.78,
+  "scores": {
+    "relative_relief": 0.82,
+    "slope_distribution": 0.75,
+    "surface_roughness": 0.77
+  },
+  "warnings": []
+}

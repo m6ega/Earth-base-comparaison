@@ -1,0 +1,7 @@
+{
+  "status": "error",
+  "error": {
+    "code": "INVALID_DEM",
+    "message": "The uploaded file is not a valid DEM GeoTIFF."
+  }
+}
