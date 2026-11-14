@@ -27,7 +27,8 @@ implemented.
 ## Quick start (local)
 
 Requirements: Python 3.14 (3.12 also has wheels for every dependency). No system
-GDAL or PROJ is needed: `rasterio` and `pyproj` wheels bundle them.
+GDAL or PROJ is needed: `rasterio` and `pyproj` wheels bundle them. On minimal
+Linux images install the expat library (`libexpat1`).
 
 ```bash
 cd backend

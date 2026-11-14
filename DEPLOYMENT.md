@@ -9,6 +9,8 @@ same origin. No database, queue, object storage or secrets are required.
 - x86-64 Linux host or container platform (any provider that runs a Dockerfile,
   or a Python 3.14 runtime). Python 3.12 also works; all dependencies ship
   prebuilt manylinux wheels, and `rasterio`/`pyproj` bundle GDAL and PROJ.
+  The only system library needed is **expat** (`libexpat1` on Debian/Ubuntu),
+  present on most hosts and installed by the Dockerfile.
 - Memory: plan **≥ 1 GB per concurrent analysis** (2 analyses per worker by
   default). Large uploads decode up to 40 million cells per DEM.
 - Disk: about 10 MB for the application and references, plus temporary space for

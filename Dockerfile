@@ -6,7 +6,13 @@
 #
 # All geospatial libraries come from prebuilt manylinux wheels: rasterio bundles
 # GDAL and pyproj bundles PROJ, so no system GDAL/PROJ packages are required.
+# The rasterio wheel links against the system expat library (libexpat.so.1),
+# which slim images do not ship.
 FROM python:3.14-slim-bookworm
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libexpat1 \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
