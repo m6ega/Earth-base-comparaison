@@ -5,12 +5,18 @@
     'use strict';
 
     // ---- Configuration ----------------------------------------------------------------
-    const API_BASE = String(window.TERRA_API_BASE_URL || '').replace(/\/+$/, '') + '/';
+    // API origin: config.js may set TERRA_API_BASE_URL (local development with a
+    // separate static server). In production the backend serves this page, so
+    // the API is on the same origin and no configuration is needed.
+    const API_BASE = new URL(
+        String(window.TERRA_API_BASE_URL || window.location.origin).replace(/\/+$/, '') + '/',
+        window.location.href
+    ).href;
     const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
-    // Elevation units: metres by default. The value is only sent when the backend
-    // reports that the GeoTIFF declares no units; declared units (e.g. feet) are
-    // always honoured by the backend and never overridden from here.
+    // Elevation units: metres by default, sent as vertical_unit_fallback. The
+    // backend applies it only to files that declare no units; declared units
+    // (e.g. feet) are always honoured and never overridden from here.
     const DEFAULT_VERTICAL_UNIT = 'metre';
 
     // Planets reachable with the hero switch. References are grouped by the
@@ -18,6 +24,14 @@
     const PLANETS = {
         mars: { label: 'Mars', other: 'moon' },
         moon: { label: 'Moon', other: 'mars' },
+    };
+
+    // Preferred initial reference per planet. Used only when it is actually
+    // registered; otherwise the first available reference (by id) is chosen.
+    // This is a preference, not an inventory: every registered reference is offered.
+    const DEFAULT_REFERENCE = {
+        mars: 'mars-gale',
+        moon: 'moon-mons-mouton',
     };
 
     const WARNING_TITLES = {
@@ -43,8 +57,8 @@
     };
 
     // Scientific notes: condition-specific cautions shown near the score. Each is
-    // triggered only by warning codes actually returned by the backend (or the
-    // frontend's own metres default), never inferred from the data here.
+    // triggered only by warning codes actually returned by the backend, never
+    // inferred from the data here.
     const SCIENTIFIC_NOTES = [
         {
             kind: 'terrain',
@@ -262,8 +276,11 @@
     const referenceById = (id) =>
         state.references.find((r) => r.id === id) || null;
 
+    // Deterministic order regardless of API or filesystem ordering.
     const referencesFor = (planet) =>
-        state.references.filter((r) => r.body === planet);
+        state.references
+            .filter((r) => r.body === planet)
+            .sort((a, b) => a.id.localeCompare(b.id));
 
     function setPlanet(planet) {
         if (!PLANETS[planet]) return;
@@ -296,6 +313,7 @@
         const refs = referencesFor(planet);
         const next =
             refs.find((r) => r.id === state.lastSelection[planet]) ||
+            refs.find((r) => r.id === DEFAULT_REFERENCE[planet]) ||
             refs[0] ||
             null;
 
@@ -889,14 +907,14 @@
     // ---- Analyze -----------------------------------------------------------------------
     // The only place that calls POST /analyze. Planet and reference changes never do.
 
-    async function postAnalyze(file, referenceId, verticalUnit, signal) {
+    async function postAnalyze(file, referenceId, signal) {
         const body = new FormData();
         body.append('file', file);
         body.append('reference_id', referenceId);
-
-        if (verticalUnit) {
-            body.append('vertical_unit', verticalUnit);
-        }
+        // Metres are the default only for files that declare no elevation units.
+        // Declared units (e.g. feet) always take precedence on the backend, which
+        // reports VERTICAL_UNITS_ASSUMED whenever this default is applied.
+        body.append('vertical_unit_fallback', DEFAULT_VERTICAL_UNIT);
 
         let response;
 
@@ -961,22 +979,9 @@
         scrollToComparison();
 
         try {
-            // First attempt: no unit, so units declared in the GeoTIFF (metres,
-            // feet, US survey feet) are used as-is by the backend.
-            let unitsAssumed = false;
-            let { response, data } = await postAnalyze(file, referenceId, null, controller.signal);
-
-            // Only when the file declares no units: fall back to the metres default.
-            if (
-                isCurrent() &&
-                !response.ok &&
-                data?.error?.code === 'UNKNOWN_VERTICAL_UNITS'
-            ) {
-                unitsAssumed = true;
-                ({ response, data } = await postAnalyze(
-                    file, referenceId, DEFAULT_VERTICAL_UNIT, controller.signal
-                ));
-            }
+            // Single request: declared units are used as-is by the backend; the
+            // metres default applies only to files that declare none.
+            const { response, data } = await postAnalyze(file, referenceId, controller.signal);
 
             if (!isCurrent()) return;
 
@@ -1021,7 +1026,7 @@
             if (!isCurrent()) return;
 
             state.currentAnalysisResult = data;
-            render(data, file, { unitsAssumed });
+            render(data, file);
             setPhase('success');
 
         } catch (error) {
@@ -1103,21 +1108,16 @@
             : { message };
     }
 
-    function render(data, file, { unitsAssumed = false } = {}) {
+    function render(data, file) {
         const ref = data.reference;
         const label = planetLabel(String(ref.body || state.activePlanet).toLowerCase());
         const earthURL = previewURL(data.earth_preview_url);
         const refURL = previewURL(ref.preview_url);
         const scale = parseComparisonScale(data.warnings);
 
-        // Backend warnings are shown as returned; the frontend only adds a
-        // clearly labelled note when it applied the metres default itself.
-        const warnings = unitsAssumed
-            ? [...data.warnings, {
-                code: 'VERTICAL_UNITS_ASSUMED',
-                message: 'This GeoTIFF does not declare its elevation units, so its values were read as metres (the default). If the file actually stores feet, these results are not valid.',
-            }]
-            : data.warnings;
+        // Backend warnings are displayed exactly as returned.
+        const warnings = data.warnings;
+        const unitsAssumed = warnings.some((w) => w.code === 'VERTICAL_UNITS_ASSUMED');
 
         showImage(ui.earthPreview, earthURL, ui.earthEmpty);
         ui.earthLoading.hidden = true;
