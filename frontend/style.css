@@ -527,10 +527,8 @@ body[data-planet="moon"] .planet-glow {
     right: -210px;
     width: clamp(420px, 58vw, 820px);
     aspect-ratio: 1;
-    background-image: url("./assets/earth.png");
-    background-size: contain;
-    background-position: center;
-    background-repeat: no-repeat;
+    /* The originally referenced assets/earth.png was never added to the
+       repository (404). No image is drawn; the aura ring (::after) remains. */
     border-radius: 50%;
     filter:
         drop-shadow(0 0 18px rgba(65, 160, 255, 0.55))
@@ -2562,10 +2560,8 @@ body[data-planet="moon"] .tag--mars .tag__dot {
     bottom: -260px;
     width: clamp(360px, 48vw, 650px);
     aspect-ratio: 1;
-    background-image: url("./assets/mars.jpg");
-    background-size: contain;
-    background-position: center;
-    background-repeat: no-repeat;
+    /* The originally referenced assets/mars.jpg was never added to the
+       repository (404). No image is drawn; the footer aura (::after) remains. */
     border-radius: 50%;
     filter:
         drop-shadow(0 0 20px rgba(255, 95, 60, 0.55))
