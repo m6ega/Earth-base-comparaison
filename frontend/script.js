@@ -28,6 +28,7 @@
 
     const ui = {
         body: document.body,
+
         input: $('demInput'),
         uploadBtn: $('uploadBtn'),
         uploadLabel: $('uploadLabel'),
@@ -43,7 +44,6 @@
         noticeTitle: $('noticeTitle'),
         noticeMessage: $('noticeMessage'),
 
-        // Elevation-unit selector
         unitChoice: $('unitChoice'),
         verticalUnit: $('verticalUnit'),
 
@@ -51,6 +51,7 @@
         engineLabel: $('engineLabel'),
         extentNote: $('extentNote'),
 
+        // Mars reference
         marsTitle: $('marsTitle'),
         marsPreview: $('marsPreview'),
         marsPlaceholder: $('marsPlaceholder'),
@@ -58,6 +59,17 @@
         marsDataset: $('marsDataset'),
         marsEffective: $('marsEffective'),
 
+        // Planet visual toggle
+        planetName: $('planetName'),
+        planetToggleBtn: $('planetToggleBtn'),
+        planetToggleLabel: $('planetToggleLabel'),
+        moonPlaceholder: $('moonPlaceholder'),
+        planetTagLabel: $('planetTagLabel'),
+        marsCoords: $('marsCoords'),
+        marsFacts: $('marsFacts'),
+        marsFigureCaption: $('marsFigureCaption'),
+
+        // Earth panel
         earthTitle: $('earthTitle'),
         earthSubtitle: $('earthSubtitle'),
         earthFrame: $('earthFrame'),
@@ -70,6 +82,7 @@
         earthStatus: $('earthStatus'),
         earthExpand: $('earthExpand'),
 
+        // Results
         results: $('results'),
         resultsTitle: $('resultsTitle'),
         mockBadge: $('mockBadge'),
@@ -101,14 +114,19 @@
         lightboxCaption: $('lightboxCaption'),
     };
 
-    // retryable: true when the same file can succeed after another attempt.
     const state = {
         phase: 'idle',
         file: null,
         chartData: null,
         counter: 0,
         retryable: true,
+        visualPlanet: 'mars',
     };
+
+    // Preserve the original Mars heading and caption.
+    const originalPlanetName = ui.planetName?.textContent || 'Mars.';
+    const originalPlanetTag = ui.planetTagLabel?.textContent || 'Mars reference';
+    const originalMarsCaption = ui.marsFigureCaption?.textContent || '';
 
     // ---- Small helpers -----------------------------------------------------------------
 
@@ -142,6 +160,92 @@
         }
     }
 
+    // ---- Planet visual toggle -----------------------------------------------------------
+
+    function setPlanet(planet) {
+        if (planet !== 'mars' && planet !== 'moon') return;
+
+        state.visualPlanet = planet;
+
+        const isMoon = planet === 'moon';
+
+        ui.body.dataset.planet = planet;
+
+        if (ui.planetName) {
+            ui.planetName.textContent = isMoon ? 'the Moon.' : originalPlanetName;
+            ui.planetName.classList.toggle('is-moon', isMoon);
+        }
+
+        if (ui.planetToggleLabel) {
+            ui.planetToggleLabel.textContent = isMoon
+                ? 'Switch to Mars'
+                : 'Switch to Moon';
+        }
+
+        if (ui.planetToggleBtn) {
+            ui.planetToggleBtn.setAttribute('aria-pressed', String(isMoon));
+            ui.planetToggleBtn.setAttribute(
+                'aria-label',
+                isMoon ? 'Switch comparison display to Mars' : 'Switch comparison display to the Moon'
+            );
+        }
+
+        if (ui.planetTagLabel) {
+            ui.planetTagLabel.textContent = isMoon
+                ? 'Moon preview'
+                : originalPlanetTag;
+        }
+
+        // Update the hero description for the selected visual target.
+        $('heroEyebrowLabel').textContent = isMoon
+            ? 'Lunar visual preview · analysis coming soon'
+            : 'Gale Crater reference · NASA MOLA';
+
+        // Make the upload hint clear that Moon analysis is not available.
+        $('fileHint').textContent = isMoon
+            ? 'GeoTIFF elevation model (.tif, .tiff), up to 50 MB. Moon analysis is not available yet.'
+            : 'GeoTIFF elevation model (.tif, .tiff), up to 50 MB. Compared with the Gale Crater reference.';
+
+        // Show the lunar placeholder, never a Mars image.
+        if (ui.moonPlaceholder) {
+            ui.moonPlaceholder.hidden = !isMoon;
+        }
+
+        if (ui.marsPreview) {
+            ui.marsPreview.hidden = isMoon || !ui.marsPreview.getAttribute('src');
+        }
+
+        if (ui.marsPlaceholder) {
+            ui.marsPlaceholder.hidden = isMoon || Boolean(
+                ui.marsPreview?.getAttribute('src')
+            );
+        }
+
+        // Mars-only metadata should not be presented as lunar information.
+        if (ui.marsCoords) ui.marsCoords.hidden = isMoon;
+        if (ui.marsFacts) ui.marsFacts.hidden = isMoon;
+
+        if (ui.marsFigureCaption) {
+            ui.marsFigureCaption.textContent = isMoon
+                ? 'Lunar reference preview · visual placeholder only'
+                : originalMarsCaption;
+        }
+
+        // Hide Mars analysis results while the Moon is selected.
+        if (ui.results) {
+            ui.results.hidden = isMoon || state.phase !== 'success';
+        }
+
+        // Keep the backend Mars-only. Never analyze while Moon mode is active.
+        setPhase(state.phase);
+    }
+
+    if (ui.planetToggleBtn) {
+        ui.planetToggleBtn.addEventListener('click', () => {
+            setPlanet(state.visualPlanet === 'mars' ? 'moon' : 'mars');
+        });
+    }
+
     // ---- Phase machine -----------------------------------------------------------------
 
     function setPhase(phase) {
@@ -151,6 +255,12 @@
         const busy = phase === 'analyzing';
         const hasFile = Boolean(state.file);
         const fileRejected = phase === 'error' && !state.retryable;
+        const isMoon = state.visualPlanet === 'moon';
+
+        // Prevent changing comparison targets during an active analysis.
+        if (ui.planetToggleBtn) {
+            ui.planetToggleBtn.disabled = busy;
+        }
 
         const uploadPrimary = phase === 'idle' || phase === 'success' || fileRejected;
         setButtonStyle(ui.uploadBtn, uploadPrimary);
@@ -165,15 +275,19 @@
         const analyzePrimary =
             phase === 'selected' || (phase === 'error' && state.retryable) || busy;
 
-        setButtonStyle(ui.analyzeBtn, analyzePrimary && hasFile);
-        ui.analyzeBtn.disabled = busy || !hasFile || phase === 'success';
+        setButtonStyle(ui.analyzeBtn, analyzePrimary && hasFile && !isMoon);
+
+        ui.analyzeBtn.disabled =
+            busy || !hasFile || phase === 'success' || isMoon;
+
         ui.analyzeBtn.classList.toggle('is-busy', busy);
         ui.analyzeBtn.setAttribute('aria-busy', String(busy));
 
         ui.analyzeLabel.textContent =
-            busy ? 'Analyzing…'
-                : phase === 'error' && hasFile ? 'Try again'
-                    : 'Analyze Terrain';
+            isMoon ? 'Moon analysis coming soon'
+                : busy ? 'Analyzing…'
+                    : phase === 'error' && hasFile ? 'Try again'
+                        : 'Analyze Terrain';
 
         ui.newAnalysisBtn.disabled = busy;
     }
@@ -188,7 +302,6 @@
         ui.noticeMessage.textContent = message;
         ui.notice.hidden = false;
 
-        // Restart the entrance animation for repeated errors.
         ui.notice.style.animation = 'none';
         void ui.notice.offsetWidth;
         ui.notice.style.animation = '';
@@ -397,9 +510,12 @@
     // ---- Analyze -----------------------------------------------------------------------
 
     ui.analyzeBtn.addEventListener('click', async () => {
-        if (state.phase === 'analyzing' || !state.file) return;
+        if (
+            state.phase === 'analyzing' ||
+            !state.file ||
+            state.visualPlanet !== 'mars'
+        ) return;
 
-        // If the backend previously requested units, the user must choose one.
         const needsUnit = !ui.unitChoice.hidden;
         const selectedUnit = needsUnit ? ui.verticalUnit.value : '';
 
@@ -430,8 +546,6 @@
             body.append('file', file);
             body.append('reference_id', REFERENCE_ID);
 
-            // Only send this field when the user has selected a unit.
-            // If metadata already declares the units, the backend detects them itself.
             if (selectedUnit) {
                 body.append('vertical_unit', selectedUnit);
             }
@@ -460,8 +574,6 @@
             if (!response.ok || data?.status === 'error') {
                 const errorCode = data?.error?.code || '';
 
-                // Special case: missing elevation units.
-                // Keep the selected file and ask the user to specify metres or feet.
                 if (errorCode === 'UNKNOWN_VERTICAL_UNITS') {
                     throw new AnalysisError(
                         data?.error?.message ||
@@ -512,8 +624,6 @@
 
             state.retryable = err.retryable;
 
-            // This is the one error that requires a user choice rather than
-            // replacing the uploaded file.
             if (err.code === 'UNKNOWN_VERTICAL_UNITS') {
                 ui.unitChoice.hidden = false;
                 ui.earthStatus.textContent = 'Units required';
@@ -545,7 +655,6 @@
         }
     });
 
-    // Clear the old error message when the user changes their selection.
     ui.verticalUnit.addEventListener('change', () => {
         if (ui.verticalUnit.value) {
             clearNotice();
@@ -578,7 +687,6 @@
         const marsURL = previewURL(data.reference.preview_url);
         const scale = parseComparisonScale(data.warnings);
 
-        // Panels
         showImage(ui.earthPreview, earthURL, ui.earthEmpty);
         ui.earthLoading.hidden = true;
         ui.earthFrame.dataset.state = 'loaded';
@@ -614,7 +722,6 @@
                 : `Both images cover roughly the compared ${scale.widthKm} km window. The Mars image also includes plot axes and a colour scale.`)
             : 'Each image is labelled with the ground area it shows. The two previews are not drawn at the same scale.';
 
-        // Summary
         ui.mockBadge.hidden = !data.is_mock;
         ui.cmpReference.textContent =
             `${data.reference.name} · ${data.reference.dataset}`;
@@ -630,7 +737,6 @@
 
         ui.legendMars.textContent = `Mars · ${data.reference.name}`;
 
-        // Scores
         const total = data.total_similarity;
 
         ui.scoreValue.setAttribute(
@@ -647,11 +753,9 @@
             $(key + 'Marker').style.setProperty('--pos', '0%');
         }
 
-        // Chart and table
         state.chartData = data.charts.slope_distribution;
         renderTable(state.chartData);
 
-        // Warnings
         ui.warnings.replaceChildren(...data.warnings.map((w) => {
             const li = document.createElement('li');
             li.className = 'warning';
@@ -682,8 +786,7 @@
         ui.referenceMetadata.textContent =
             `Reference: ${data.reference.name}, ${data.reference.dataset}. Effective resolution: ${describeEffective(data.reference.effective_resolution_m)}.`;
 
-        // Reveal results
-        ui.results.hidden = false;
+        ui.results.hidden = state.visualPlanet === 'moon';
 
         ui.results.querySelectorAll('.reveal').forEach((n) => {
             n.style.animation = 'none';
@@ -737,6 +840,11 @@
             if (!img.getAttribute('src')) return;
 
             img.hidden = true;
+
+            // Never reveal the Mars placeholder over the Moon preview.
+            if (img === ui.marsPreview && state.visualPlanet === 'moon') {
+                return;
+            }
 
             if (placeholder) {
                 placeholder.hidden = false;
@@ -1151,7 +1259,7 @@
     document.querySelectorAll('.frame__expand').forEach((button) => {
         button.addEventListener('click', () => {
             const img = $(button.dataset.expand);
-            if (!img.getAttribute('src')) return;
+            if (!img || !img.getAttribute('src')) return;
 
             const isMars = img === ui.marsPreview;
 
@@ -1205,25 +1313,44 @@
                 ui.marsPlaceholder
             );
 
+            // Keep the Mars image hidden if Moon mode is already selected.
+            if (state.visualPlanet === 'moon') {
+                ui.marsPreview.hidden = true;
+                ui.marsPlaceholder.hidden = true;
+            }
+
         } catch {
             setEngine('offline');
-            ui.marsPlaceholder.querySelector('.skeleton').hidden = true;
-            ui.marsPlaceholderText.textContent =
-                'Reference preview unavailable: the analysis engine is not reachable.';
+
+            if (ui.marsPlaceholder) {
+                const skeleton = ui.marsPlaceholder.querySelector('.skeleton');
+                if (skeleton) skeleton.hidden = true;
+
+                if (ui.marsPlaceholderText) {
+                    ui.marsPlaceholderText.textContent =
+                        'Reference preview unavailable: the analysis engine is not reachable.';
+                }
+            }
         }
     }
 
     // ---- Start --------------------------------------------------------------------------
 
-    // Ensure the selector exists in index.html before running this controller.
     if (!ui.unitChoice || !ui.verticalUnit) {
         console.error(
             'Terra Analog: elevation-unit selector elements were not found in index.html.'
         );
     }
 
+    if (!ui.planetToggleBtn || !ui.planetToggleLabel || !ui.planetName || !ui.moonPlaceholder) {
+        console.warn(
+            'Terra Analog: one or more planet-toggle elements are missing from index.html. The Mars experience will still work.'
+        );
+    }
+
     hideUnitChoice();
     setPhase('idle');
+    setPlanet('mars');
     loadReference();
 
 })();
