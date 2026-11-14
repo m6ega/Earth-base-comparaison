@@ -280,6 +280,7 @@ def analyze(
             f"Unknown reference_id '{reference_id}'.",
         )
 
+    load_reference(reference_id)  # rejects disabled, corrupt or unapproved entries
     check_extension(file.filename)
 
     # Empty form values are treated as no selection.

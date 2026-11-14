@@ -43,7 +43,7 @@ def test_reference_loader_verifies_mars_geometry():
     dx, dy = ref.source.spacing_xy_m
     assert dy == pytest.approx(463.0576672, rel=1e-6)
     assert dx == pytest.approx(463.0576672 * np.cos(np.radians(5.4375)), rel=1e-4)
-    assert ref.api_object() == {
+    assert {key: ref.api_object()[key] for key in ("id", "name", "dataset", "effective_resolution_m", "preview_url")} == {
         "id": "mars-gale",
         "name": meta["region"],
         "dataset": meta["source"],

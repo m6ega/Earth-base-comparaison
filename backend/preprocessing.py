@@ -73,6 +73,8 @@ class DemSource:
     native_spacing_m: float  # conservative: the larger of the two axes
     spacing_xy_m: tuple[float, float]
     half_extent_m: float  # half side of the largest centred square inside the raster
+    elevation_range_m: tuple[float, float] | None = None
+    effective_resolution_m: float | None = None
 
 
 @dataclass(frozen=True)
@@ -129,15 +131,20 @@ def describe_source(
     vertical_to_metres: float,
 ) -> DemSource:
     """Measure centre, physical pixel spacing and usable centred extent."""
+    if width <= 0 or height <= 0 or not all(math.isfinite(v) for v in transform) or transform.determinant == 0:
+        raise errors.fail(errors.UNSUPPORTED_CRS, "Invalid or singular raster geometry.")
     to_geo = _transformer(horizontal_crs, horizontal_crs.geodetic_crs)
     cx, cy = _apply(transform, width / 2.0, height / 2.0)
     lon, lat = to_geo.transform(cx, cy)
-    if not (math.isfinite(lon) and math.isfinite(lat)) or abs(lat) > 89.0:
+    if not (math.isfinite(lon) and math.isfinite(lat)) or abs(lat) > 90.0:
         raise errors.fail(
             errors.UNSUPPORTED_CRS,
-            "The raster centre could not be located on the planet, or it lies too "
-            "close to a pole for the local metric projection.",
+            "The raster centre could not be located on the planetary surface.",
         )
+    # At the exact pole longitude is arbitrary. Choose a deterministic meridian;
+    # work in projected Cartesian coordinates, never divide by cos(latitude).
+    if abs(lat) == 90.0:
+        lon = 0.0
     local = local_metric_crs(horizontal_crs, lon, lat)
     to_local = _transformer(horizontal_crs, local)
 
@@ -145,8 +152,22 @@ def describe_source(
     col, row = width / 2.0, height / 2.0
     pts = [_apply(transform, col, row), _apply(transform, col + 1, row), _apply(transform, col, row + 1)]
     xs, ys = to_local.transform([p[0] for p in pts], [p[1] for p in pts])
+    # Validate local projection round-trip and independent geodesic distances.
+    # AEQD is well-defined at the pole when created on the same planetary datum.
+    back = _transformer(local, horizontal_crs)
+    rx, ry = back.transform(xs, ys)
+    if not all(math.isfinite(v) for v in [*xs, *ys, *rx, *ry]) or any(
+        math.hypot(a-p[0], b-p[1]) > max(abs(transform.a), abs(transform.e), 1) * 1e-5
+        for a,b,p in zip(rx,ry,pts)
+    ):
+        raise errors.fail(errors.UNSUPPORTED_CRS, "Local planetary projection is not invertible.")
+    glon, glat = to_geo.transform([p[0] for p in pts], [p[1] for p in pts])
+    distances = [horizontal_crs.get_geod().inv(glon[0], glat[0], glon[i], glat[i])[2] for i in (1,2)]
     dx = math.hypot(xs[1] - xs[0], ys[1] - ys[0])
     dy = math.hypot(xs[2] - xs[0], ys[2] - ys[0])
+    if not all(math.isfinite(d) and d > 0 and math.isclose(d, measured, rel_tol=1e-5)
+               for d,measured in zip(distances,(dx,dy))):
+        raise errors.fail(errors.UNSUPPORTED_CRS, "Planetary ground-distance verification failed.")
     lo, hi = settings.PIXEL_SPACING_RANGE_M
     if not all(math.isfinite(v) and lo <= v <= hi for v in (dx, dy)):
         raise errors.fail(
@@ -166,6 +187,8 @@ def describe_source(
     if not (np.all(np.isfinite(lx)) and np.all(np.isfinite(ly))):
         raise errors.fail(errors.UNSUPPORTED_CRS, "The raster outline could not be projected.")
     half_extent = float(np.min(np.maximum(np.abs(lx), np.abs(ly))))
+    if not math.isfinite(half_extent) or half_extent <= 0:
+        raise errors.fail(errors.UNSUPPORTED_CRS, "No usable local planetary footprint.")
 
     return DemSource(
         path=path,
@@ -183,7 +206,7 @@ def describe_source(
 
 def plan_common_grid(earth: DemSource, mars: DemSource) -> tuple[float, int]:
     """Common cell size (coarser native spacing) and cell count (equal footprint)."""
-    resolution = max(earth.native_spacing_m, mars.native_spacing_m)
+    resolution = max(earth.native_spacing_m, mars.native_spacing_m, earth.effective_resolution_m or 0, mars.effective_resolution_m or 0)
     half = min(earth.half_extent_m, mars.half_extent_m)
     cells = int(math.floor(2.0 * half / resolution))
     if cells < settings.MIN_GRID_CELLS:
@@ -238,14 +261,17 @@ def _read_footprint(source: DemSource, half_side: float, margin_m: float):
     return data, win_transform
 
 
-def _check_plausible(data: np.ndarray, body: str) -> None:
+def _check_plausible(data: np.ndarray, body: str, verified_range=None) -> None:
     valid = data[np.isfinite(data)]
     if valid.size == 0:
         raise errors.fail(
             errors.INSUFFICIENT_VALID_DATA,
             "The DEM has no valid elevation values in the comparison window (empty or fully masked).",
         )
-    lo, hi = settings.ELEVATION_RANGE_M[body]
+    limits = verified_range if verified_range is not None else settings.ELEVATION_RANGE_M.get(body)
+    if limits is None:
+        raise errors.fail(errors.INVALID_DEM, "No validated elevation bounds for this planetary body.")
+    lo, hi = limits
     vmin, vmax = float(valid.min()), float(valid.max())
     if vmin < lo or vmax > hi:
         raise errors.fail(
@@ -361,7 +387,7 @@ def harmonize(source: DemSource, resolution_m: float, cells: int) -> HarmonizedG
     """
     half_side = resolution_m * cells / 2.0
     data, win_transform = _read_footprint(source, half_side, margin_m=2 * resolution_m)
-    _check_plausible(data, source.body)
+    _check_plausible(data, source.body, source.elevation_range_m)
 
     if near_native(source, resolution_m):
         aligned = _aligned_indices(source, win_transform, data.shape, resolution_m, cells)

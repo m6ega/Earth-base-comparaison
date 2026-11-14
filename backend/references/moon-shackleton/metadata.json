@@ -1,0 +1,92 @@
+{
+  "reference_id": "moon-shackleton",
+  "planet": "Moon",
+  "body": "Moon",
+  "region": "Shackleton Crater",
+  "display_name": "Shackleton Crater",
+  "dataset": "LOLA adjusted south polar DEM",
+  "source": "NASA LRO Lunar Orbiter Laser Altimeter (LOLA), PGDA product 90",
+  "source_file": "LDEM_80S_80MPP_ADJ.tiff",
+  "source_product": "LDEM_80S_80MPP_ADJ",
+  "source_sha256": "82030dcbdd7c4bb0c7d858e9b4b293b9f2cda5a543ba31ec0f42784bd6beee5a",
+  "source_url": "https://pgda.gsfc.nasa.gov/products/90",
+  "center": {
+    "latitude_planetocentric": -89.67031703745427,
+    "longitude_positive_east": 129.8055710922652
+  },
+  "named_feature_center": {
+    "latitude_planetocentric": -89.67,
+    "longitude_positive_east": 129.78,
+    "authority": "https://planetarynames.wr.usgs.gov/Feature/5450"
+  },
+  "coordinate_system": {
+    "projection": "Moon south polar stereographic",
+    "crs_wkt": "PROJCS[\"Moon (2015) - Sphere / Ocentric / South Polar\",GEOGCS[\"Moon (2015) - Sphere / Ocentric\",DATUM[\"Moon (2015) - Sphere\",SPHEROID[\"Moon (2015) - Sphere\",1737400,0,AUTHORITY[\"IAU\",\"30100\"]],AUTHORITY[\"IAU\",\"30100\"]],PRIMEM[\"Reference Meridian\",0,AUTHORITY[\"IAU\",\"30100\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"IAU\",\"30100\"]],PROJECTION[\"Polar_Stereographic\"],PARAMETER[\"latitude_of_origin\",-90],PARAMETER[\"central_meridian\",0],PARAMETER[\"false_easting\",0],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",NORTH],AXIS[\"Northing\",NORTH],AUTHORITY[\"IAU\",\"30135\"]]",
+    "lunar_radius_metres": 1737400,
+    "central_meridian_degrees": 0,
+    "reference_frame": "MOON_ME, JPL DE421"
+  },
+  "elevation": {
+    "unit": "metres",
+    "reference": "Lunar reference sphere, radius 1737400 m",
+    "minimum": -2868.79736328125,
+    "maximum": 1958.05419921875,
+    "mean": 80.22727572516187,
+    "scale_factor": 1,
+    "offset": 0
+  },
+  "raster": {
+    "width": 500,
+    "height": 500,
+    "resolution_metres": [
+      80,
+      80
+    ],
+    "crop_size_requested_km": 40,
+    "nodata": -3.4028234663852886e+38,
+    "valid_pixels": 250000,
+    "nodata_pixels": 0,
+    "valid_fraction": 1.0,
+    "transform": [
+      80.0,
+      0.0,
+      -12320.0,
+      0.0,
+      -80.0,
+      13600.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "bounds_projected_metres": [
+      -12320.0,
+      -26400.0,
+      27680.0,
+      13600.0
+    ]
+  },
+  "effective_resolution": {
+    "source_file": "LDEM_80S_80MPP_ADJ_EFFRES.tiff",
+    "minimum_metres": 5.652224540710449,
+    "maximum_metres": 131.7107391357422,
+    "median_metres": 16.047313690185547
+  },
+  "processing": [
+    "Native integer window col=3646, row=3630, width=500, height=500; centre from IAU Shackleton position snapped to source grid.",
+    "40 km projected square selected to include crater and surrounding rim terrain. No reprojection, upsampling, interpolation, merging or scaling.",
+    "Preserved valid float32 source elevations exactly; source NaN/masked cells map to finite float32-min NoData. Valid zero preserved.",
+    "Preview: existing backend render_rgba/encode_png, 2-98 percentile display stretch and hillshade (azimuth 315 degrees, altitude 45 degrees). Actual DEM pixels, transparent invalid cells."
+  ],
+  "limitations": [
+    "80 m projected spacing is not effective resolution; see auxiliary EFFRES statistics.",
+    "Upstream DEM gridding/interpolation is inherited; no observation mask supplied.",
+    "Crop includes the south pole; longitude wraps and is undefined at the pole. Use projected bounds and CRS rather than a naive geographic rectangle.",
+    "Current backend only registers Mars and enforces Mars radius; moon elevation limits are absent.",
+    "Current preprocessing rejects raster centres with absolute latitude above 89 degrees; Shackleton needs a separately reviewed polar compatibility change."
+  ],
+  "citations": [
+    "Barker et al. (2023), Planetary Science Journal 4, 183; doi:10.3847/PSJ/acf3e1",
+    "NASA GSFC PGDA dataset doi:10.60903/gsfcpgda-lola-spole",
+    "IAU/USGS Gazetteer of Planetary Nomenclature, Shackleton feature 5450"
+  ]
+}

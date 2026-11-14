@@ -21,7 +21,7 @@ import similarity
 import terrain_features as tf
 from preprocessing import HarmonizedGrid, harmonize, near_native, plan_common_grid, preview_grid
 from preview import png_data_url
-from reference import MarsReference, load_reference
+from reference import PlanetaryReference, load_reference
 from validation import open_earth_dem
 
 METRICS = ("relative_relief", "slope_distribution", "surface_roughness")
@@ -79,25 +79,34 @@ def compute_features(grid: HarmonizedGrid, label: str) -> FeatureSet:
     )
 
 
+def mars_features(reference_id, resolution_key, cells, methodology_version):
+    """Compatibility entry point with content-aware invalidation."""
+    ref = load_reference(reference_id)
+    return reference_features(reference_id, resolution_key, cells, methodology_version, ref.fingerprint)
+
+
 @lru_cache(maxsize=32)
-def mars_features(
+def reference_features(
     reference_id: str,
     resolution_key: float,
     cells: int,
     methodology_version: str,
+    fingerprint: str,
 ) -> FeatureSet:
     """Cached Mars features, keyed by reference, processing scale and methodology version."""
 
     ref = load_reference(reference_id)
+    if ref.fingerprint != fingerprint:
+        raise errors.fail(errors.REFERENCE_UNAVAILABLE, "Reference changed during analysis; retry.")
     grid = harmonize(ref.source, resolution_key, cells)
 
     if grid.valid_fraction < settings.MIN_VALID_FRACTION:
         raise errors.fail(
             errors.PROCESSING_FAILED,
-            "The Mars reference has insufficient valid data for this footprint.",
+            "The selected reference has insufficient valid data for this footprint.",
         )
 
-    return compute_features(grid, "Mars reference")
+    return compute_features(grid, "planetary reference")
 
 
 def _warning(code: str, message: str) -> dict:
@@ -115,7 +124,7 @@ def analyze(
     does not provide usable elevation-unit metadata.
     """
 
-    ref: MarsReference = load_reference(reference_id)
+    ref: PlanetaryReference = load_reference(reference_id)
 
     # Validate the Earth DEM and determine its elevation conversion factor.
     earth, facts = open_earth_dem(
@@ -139,11 +148,12 @@ def analyze(
 
     earth_feat = compute_features(earth_grid, "Earth")
 
-    mars_feat = mars_features(
+    mars_feat = reference_features(
         ref.id,
         resolution,
         cells,
         settings.METHODOLOGY_VERSION,
+        ref.fingerprint,
     )
 
     try:
@@ -184,17 +194,15 @@ def analyze(
         warnings.append(
             _warning(
                 "EFFECTIVE_RESOLUTION_UNVERIFIED",
-                f"The Mars reference grid spacing is about {ref.source.native_spacing_m:.0f} m, "
-                "but its effective resolution is not verified. MOLA grid cells are partly "
-                "interpolated where no laser track was observed, so real Mars detail may be "
-                "coarser than the grid. Mars slope and roughness may therefore be "
-                "underestimated relative to Earth.",
+                f"The {ref.approval.body} reference grid spacing is about {ref.source.native_spacing_m:.0f} m, "
+                "but its effective resolution is not verified as a single comparison scale. "
+                "Gridding and interpolation may smooth terrain; review reference limitations.",
             )
         )
 
     for label, src, feat in (
         ("Earth DEM", earth, earth_feat),
-        ("Mars reference", ref.source, mars_feat),
+        ("selected reference", ref.source, mars_feat),
     ):
         if near_native(src, resolution) and feat.sampling != "aligned":
             warnings.append(
@@ -213,7 +221,7 @@ def analyze(
             _warning(
                 "RESOLUTION_REDUCED",
                 f"The Earth DEM was averaged from about {e_sp:.1f} m to "
-                f"{resolution:.1f} m to match the Mars reference; finer Earth detail is not used.",
+                f"{resolution:.1f} m to match the selected reference; finer Earth detail is not used.",
             )
         )
 
@@ -221,7 +229,7 @@ def analyze(
         warnings.append(
             _warning(
                 "EARTH_COARSER_THAN_REFERENCE",
-                f"The Earth DEM (about {e_sp:.1f} m) is coarser than the Mars reference "
+                f"The Earth DEM (about {e_sp:.1f} m) is coarser than the selected reference "
                 f"({m_sp:.1f} m); both were compared at {resolution:.1f} m.",
             )
         )
@@ -230,8 +238,8 @@ def analyze(
         warnings.append(
             _warning(
                 "FOOTPRINT_LIMITED_BY_EARTH",
-                "The Earth DEM is smaller than the Mars reference, so only the central part "
-                "of the Mars reference with the same ground size was compared.",
+                "The Earth DEM is smaller than the selected reference, so only the central part "
+                "of the selected reference with the same ground size was compared.",
             )
         )
 
@@ -264,6 +272,10 @@ def analyze(
             )
         )
 
+    warnings.extend(_warning("REFERENCE_LIMITATION", note) for note in ref.api_object()["limitations"])
+    # Check again even on a cached feature hit: never attach stale metadata/results.
+    if load_reference(reference_id).fingerprint != ref.fingerprint:
+        raise errors.fail(errors.REFERENCE_UNAVAILABLE, "Reference changed during analysis; retry.")
     pv = preview_grid(earth, earth_grid.footprint_m)
 
     response = {
@@ -287,6 +299,7 @@ def analyze(
                 "earth": list(
                     earth_feat.histograms["slope_distribution"]
                 ),
+                "reference": list(mars_feat.histograms["slope_distribution"]),
                 "mars": list(
                     mars_feat.histograms["slope_distribution"]
                 ),

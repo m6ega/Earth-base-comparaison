@@ -20,7 +20,8 @@ def assert_contract_success(body: dict) -> None:
     }
     assert body["status"] == "success" and body["is_mock"] is False
     ref = body["reference"]
-    assert set(ref) == {"id", "name", "dataset", "effective_resolution_m", "preview_url"}
+    assert set(ref) == {"id", "name", "dataset", "effective_resolution_m", "preview_url", "body", "category", "description", "center", "grid_spacing_m", "elevation_unit", "elevation_datum", "limitations", "dem_sha256", "version"}
+    assert ref["body"] in {"mars", "moon"}
     assert isinstance(ref["id"], str) and isinstance(ref["name"], str) and isinstance(ref["dataset"], str)
     assert ref["effective_resolution_m"] is None or isinstance(ref["effective_resolution_m"], (int, float))
     assert set(body["scores"]) == {"relative_relief", "slope_distribution", "surface_roughness"}
@@ -28,8 +29,9 @@ def assert_contract_success(body: dict) -> None:
         assert isinstance(v, float) and math.isfinite(v) and 0.0 <= v <= 1.0
     chart = body["charts"]["slope_distribution"]
     assert set(body["charts"]) == {"slope_distribution"}
-    assert set(chart) == {"unit", "bin_edges", "earth", "mars"}
+    assert set(chart) == {"unit", "bin_edges", "earth", "mars", "reference"}
     assert chart["unit"] == "degrees"
+    assert chart["reference"] == chart["mars"]
     n = len(chart["bin_edges"]) - 1
     assert len(chart["earth"]) == n and len(chart["mars"]) == n
     assert all(b > a for a, b in zip(chart["bin_edges"], chart["bin_edges"][1:]))
@@ -62,7 +64,7 @@ def test_references():
     assert r.status_code == 200
     body = r.json()
     assert body["is_mock"] is False
-    assert [ref["id"] for ref in body["references"]] == ["mars-gale"]
+    assert [ref["id"] for ref in body["references"]] == ["mars-gale", "moon-mons-mouton", "moon-shackleton"]
     assert body["references"][0]["preview_url"] == "/static/references/mars-gale/preview.png"
 
 

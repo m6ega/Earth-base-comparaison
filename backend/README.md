@@ -1,5 +1,12 @@
 # Backend
 
+The universal planetary reference engine supports the approved `mars-gale`,
+`moon-mons-mouton` and `moon-shackleton` datasets on `frontend--dev`.
+See [PLANETARY-REFERENCES.md](PLANETARY-REFERENCES.md) for registry approval,
+polar geometry validation, exact API extensions and the frontend handoff.
+That document supersedes Mars-only implementation descriptions below; the
+methodology 0.2 feature formulas and sampling safeguard remain unchanged.
+
 **Status:** Phase 1 terrain comparison engine implemented on `backend--dev`, pending human review. The scientific method below is a **proposal**: [docs/methodology.md](../docs/methodology.md) has not approved any formula, threshold or weight.
 
 **Owner:** Backend Lead + Claude, on `backend--dev`. Scope, stack and responsibilities: [PROJECT-CONTEXT.md](../PROJECT-CONTEXT.md).
