@@ -324,9 +324,23 @@ def analyze(
         _analysis_slots.release()
 
 
+class FrontendFiles(StaticFiles):
+    """Static frontend that browsers must revalidate (ETag) on every load.
+
+    Without Cache-Control, browsers cache script.js/style.css heuristically
+    and may keep running an old frontend against a newer API after a deploy.
+    """
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code in (200, 304):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 # Same-origin frontend: mounted last so every API route above takes precedence.
 # StaticFiles rejects path traversal; only files inside FRONTEND_DIR are served.
 if settings.SERVE_FRONTEND and (settings.FRONTEND_DIR / "index.html").is_file():
-    app.mount("/", StaticFiles(directory=settings.FRONTEND_DIR, html=True), name="frontend")
+    app.mount("/", FrontendFiles(directory=settings.FRONTEND_DIR, html=True), name="frontend")
 elif settings.SERVE_FRONTEND:
     logger.warning("Frontend directory not found; serving the API only.")

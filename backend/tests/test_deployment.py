@@ -33,6 +33,13 @@ def test_every_local_asset_referenced_by_the_frontend_exists():
         assert r.status_code == 200, f"{ref} -> {r.status_code}"
 
 
+def test_frontend_files_must_be_revalidated_after_deploys():
+    for path in ("/", "/script.js", "/style.css", "/config.js"):
+        r = client.get(path)
+        assert r.headers.get("cache-control") == "no-cache", path
+        assert r.headers.get("etag"), path
+
+
 def test_api_routes_take_precedence_over_static_files():
     assert client.get("/health").json() == {"status": "ok"}
     assert client.get("/references").json()["is_mock"] is False
