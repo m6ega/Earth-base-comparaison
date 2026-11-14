@@ -1,301 +1,344 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Terra Analog | Terrain Analyzer</title>
+    <title>Terra Analog — Planetary Terrain Analysis</title>
+    <meta name="description" content="Compare the terrain geometry of an Earth elevation model with the Gale Crater reference on Mars.">
+    <meta name="theme-color" content="#FFFFFF">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="style.css">
 </head>
 
-<body>
+<body data-phase="idle">
 
-    <aside class="sidebar">
-        <div class="logo">
-            <div class="logo-icon">TA</div>
-            <div>
-                <h2>TERRA ANALOG</h2>
-                <p>PLANETARY TERRAIN ANALYSIS</p>
-            </div>
+    <!-- Brand mascot: a small rounded four-point star. Defined once, reused everywhere. -->
+    <svg class="sprite" aria-hidden="true" focusable="false">
+        <symbol id="ta-star" viewBox="0 0 32 32">
+            <path class="star-body" d="M16 3C18.3 3 18.9 8.4 21.4 10.6C23.6 13.1 29 13.7 29 16C29 18.3 23.6 18.9 21.4 21.4C18.9 23.6 18.3 29 16 29C13.7 29 13.1 23.6 10.6 21.4C8.4 18.9 3 18.3 3 16C3 13.7 8.4 13.1 10.6 10.6C13.1 8.4 13.7 3 16 3Z"/>
+            <circle class="star-face" cx="13.4" cy="15.2" r="1.5"/>
+            <circle class="star-face" cx="18.6" cy="15.2" r="1.5"/>
+            <path class="star-smile" d="M14.5 18.3Q16 19.6 17.5 18.3"/>
+        </symbol>
+        <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></symbol>
+        <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2m8 0h2a2 2 0 0 1 2 2v2m0 8v2a2 2 0 0 1-2 2h-2m-8 0H6a2 2 0 0 1-2-2v-2M7 15l3-4 2.5 2.5L17 9"/></symbol>
+        <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Zm0 0v5h5M8.5 16.5c1.2-2 2.3-3 3.5-3s1.7 1 2.6 1 1.5-.5 2-1"/></symbol>
+        <symbol id="i-expand" viewBox="0 0 24 24"><path d="M15 4h5v5M9 20H4v-5M20 4l-6.5 6.5M4 20l6.5-6.5"/></symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 8v5m0 3.5v.01M10.3 3.9 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></symbol>
+        <symbol id="i-info" viewBox="0 0 24 24"><path d="M12 11v6m0-9.5v.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+        <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5m0 0-6 6m6-6 6 6"/></symbol>
+    </svg>
+
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+        <div class="container site-header__inner">
+            <a class="brand" href="#top" aria-label="Terra Analog — back to top">
+                <svg class="brand__mark" aria-hidden="true"><use href="#ta-star"/></svg>
+                <span class="brand__text">
+                    <span class="brand__name">Terra Analog</span>
+                    <span class="brand__tagline">Planetary Terrain Analysis</span>
+                </span>
+            </a>
+            <p class="engine" id="engineStatus" data-state="checking" role="status">
+                <span class="engine__dot" aria-hidden="true"></span>
+                <span class="engine__label" id="engineLabel">Checking analysis engine…</span>
+            </p>
         </div>
+    </header>
 
-        <nav>
-            <p class="nav-label">WORKSPACE</p>
-            <button class="nav-button active" id="homeBtn">Home</button>
-            <button class="nav-button" id="newAnalysisBtn">+ New Analysis</button>
-            <button class="nav-button" id="changeReferenceBtn">Change Reference</button>
+    <main id="main">
 
-            <p class="nav-label">INFORMATION</p>
-            <button class="nav-button" id="aboutBtn">About Terra Analog</button>
-        </nav>
+        <!-- A. Hero + the only upload/analyze controls on the page -->
+        <section class="hero" id="top" aria-labelledby="heroTitle">
+            <img class="hero__contours" src="assets/hero-contours.svg" alt="" aria-hidden="true">
+            <svg class="hero__orbit" viewBox="0 0 400 400" aria-hidden="true" focusable="false">
+                <ellipse cx="200" cy="200" rx="188" ry="74" transform="rotate(-18 200 200)"/>
+            </svg>
+            <svg class="hero__companion" aria-hidden="true" focusable="false"><use href="#ta-star"/></svg>
 
-        <div class="sidebar-footer">
-            <span class="status-dot"></span>
-            SYSTEM READY
-            <p>Terra Analog v1.0</p>
-        </div>
-    </aside>
+            <div class="container hero__inner">
+                <p class="eyebrow"><span class="eyebrow__rule" aria-hidden="true"></span>Gale Crater reference · NASA MOLA</p>
+                <h1 class="hero__title" id="heroTitle">Compare Earth terrain <span class="hero__break">with <em class="hero__mars">Mars.</em></span></h1>
+                <p class="hero__lead">Upload an Earth elevation dataset and discover terrain similarities with Martian landscapes.</p>
 
-
-    <main class="main-content">
-
-        <header class="topbar">
-            <div>
-                <p class="breadcrumb">WORKSPACE / ANALYSIS</p>
-                <h1>Terrain Analysis Dashboard</h1>
-            </div>
-
-            <div class="topbar-right">
-                <span class="status-label">MARS REFERENCE</span>
-                <span class="user-label">TA</span>
-            </div>
-        </header>
-
-
-        <section class="welcome-section">
-            <div>
-                <h2>Compare worlds. Discover similarities.</h2>
-                <p>
-                    Analyze Earth's terrain against planetary elevation
-                    datasets to identify potential analog environments.
-                </p>
-            </div>
-
-            <button class="primary-button" id="uploadBtn">
-                Upload Earth DEM
-            </button>
-
-            <button class="primary-button" id="analyzeBtn" disabled>Analyze Terrain</button>
-            <input type="file" id="demInput" accept=".tif,.tiff" hidden>
-        </section>
-
-        <section class="panel analysis-status" aria-live="polite" aria-atomic="true">
-            <p id="analysisStatus">Select an Earth GeoTIFF (.tif or .tiff), maximum 50 MB.</p>
-        </section>
-
-
-        <section class="comparison-section">
-
-            <div class="section-heading">
-                <div>
-                    <p class="section-number">01 / TERRAIN COMPARISON</p>
-                    <h2>Planetary Surface Overview</h2>
+                <div class="actions" role="group" aria-label="Analysis actions">
+                    <button type="button" class="btn btn--primary" id="uploadBtn" aria-describedby="fileHint">
+                        <svg class="btn__icon" aria-hidden="true"><use href="#i-upload"/></svg>
+                        <span class="btn__label" id="uploadLabel">Upload Earth DEM</span>
+                    </button>
+                    <button type="button" class="btn btn--secondary" id="analyzeBtn" disabled>
+                        <span class="btn__spinner" aria-hidden="true"></span>
+                        <svg class="btn__icon" aria-hidden="true"><use href="#i-scan"/></svg>
+                        <span class="btn__label" id="analyzeLabel">Analyze Terrain</span>
+                    </button>
+                    <input type="file" id="demInput" accept=".tif,.tiff,image/tiff" hidden>
                 </div>
 
-                <button class="secondary-button" id="swapBtn">
-                    ⇄ Swap DEMs
-                </button>
-            </div>
-
-
-            <div class="map-grid">
-
-                <article class="panel map-panel" id="marsPanel">
-
-                    <div class="panel-header">
-                        <div>
-                            <span class="planet-tag mars-tag">MARS REFERENCE</span>
-                            <h3>Gale Crater</h3>
-                        </div>
-                        <span class="coordinates">5.4°S / 137.8°E</span>
+                <div class="selection" aria-live="polite">
+                    <p class="selection__hint" id="fileHint">GeoTIFF elevation model (.tif, .tiff), up to 50 MB. Compared with the Gale Crater reference.</p>
+                    <div class="file-chip" id="fileChip" hidden>
+                        <svg class="file-chip__icon" aria-hidden="true"><use href="#i-file"/></svg>
+                        <span class="file-chip__body">
+                            <span class="file-chip__name" id="fileName"></span>
+                            <span class="file-chip__meta"><span id="fileSize"></span><span aria-hidden="true"> · </span><span class="file-chip__state" id="fileState"></span></span>
+                        </span>
                     </div>
-
-                    <div class="map-placeholder">
-                        <img
-                            id="marsPreview" hidden
-                            alt="Mars Gale Crater elevation preview"
-                        >
-                        <div class="map-fallback" id="marsFallback" style="display:flex">
-                            MARS TERRAIN DATA
-                            <span>Reference DEM</span>
-                        </div>
-                    </div>
-
-                    <div class="map-controls">
-                        <span class="layer-label">LAYER</span>
-                        <select class="layer-select">
-                            <option value="elevation">Elevation</option>
-                            <option value="hillshade">Hillshade</option>
-                            <option value="slope">Slope</option>
-                            <option value="roughness">Roughness</option>
-                        </select>
-
-                        <div class="zoom-controls">
-                            <button class="zoom-btn" data-zoom="in">+</button>
-                            <button class="zoom-btn" data-zoom="out">−</button>
-                            <button class="zoom-btn" data-zoom="reset">Reset</button>
-                        </div>
-                    </div>
-
-                </article>
-
-
-                <article class="panel map-panel" id="earthPanel">
-
-                    <div class="panel-header">
-                        <div>
-                            <span class="planet-tag earth-tag">EARTH UPLOAD</span>
-                            <h3 id="earthTitle">Awaiting Earth DEM</h3>
-                        </div>
-                        <span class="coordinates" id="earthCoordinates">NO DATA</span>
-                    </div>
-
-                    <div class="map-placeholder earth-placeholder">
-                        <img id="earthPreview" alt="Analyzed Earth terrain preview" hidden>
-                        <div class="upload-message" id="uploadMessage">
-                            <span class="upload-icon">+</span>
-                            <h3>Upload a DEM file</h3>
-                            <p>Import a GeoTIFF elevation dataset</p>
-                            <button class="secondary-button" id="selectFileBtn">
-                                Select File
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="map-controls">
-                        <span class="layer-label">LAYER</span>
-                        <select class="layer-select">
-                            <option value="elevation">Elevation</option>
-                            <option value="hillshade">Hillshade</option>
-                            <option value="slope">Slope</option>
-                            <option value="roughness">Roughness</option>
-                        </select>
-
-                        <div class="zoom-controls">
-                            <button class="zoom-btn" data-zoom="in">+</button>
-                            <button class="zoom-btn" data-zoom="out">−</button>
-                            <button class="zoom-btn" data-zoom="reset">Reset</button>
-                        </div>
-                    </div>
-
-                </article>
-
-            </div>
-        </section>
-
-
-        <section class="results-section" hidden>
-
-            <div class="section-heading">
-                <div>
-                    <p class="section-number">02 / ANALYSIS RESULTS</p>
-                    <h2>Terrain Similarity</h2>
                 </div>
 
-                <button class="secondary-button" id="exportBtn">
-                    Export Report
-                </button>
-            </div>
-
-
-            <div class="results-grid">
-
-                <article class="panel score-panel">
-                    <p class="panel-label">OVERALL SIMILARITY</p>
-
-                    <div class="score-circle">
-                        <div>
-                            <strong id="similarityScore">--</strong>
-                            <span>%</span>
-                        </div>
-                    </div>
-
-                    <p class="score-description" id="scoreDescription">
-                        Upload an Earth DEM to begin analysis.
+                <!-- Shown only when the uploaded DEM does not declare its elevation units -->
+                <fieldset class="unit-choice" id="unitChoice" hidden>
+                    <legend class="unit-choice__title">Elevation units not declared</legend>
+                    <p class="unit-choice__description">
+                        This GeoTIFF does not specify the units used for its elevation values.
+                        Select the correct unit so Terra Analog can convert the elevations accurately.
                     </p>
-                </article>
 
+                    <label class="unit-choice__label" for="verticalUnit">Elevation unit</label>
+                    <select class="unit-choice__select" id="verticalUnit" name="vertical_unit">
+                        <option value="">Choose elevation units</option>
+                        <option value="metre">Metres (m)</option>
+                        <option value="foot">Feet (ft)</option>
+                    </select>
 
-                <article class="panel breakdown-panel">
-                    <p class="panel-label">SIMILARITY BREAKDOWN</p>
+                    <p class="unit-choice__hint">
+                        Check your DEM's source documentation if you are unsure. Terra Analog will not guess.
+                    </p>
+                </fieldset>
 
-                    <div class="metric">
-                        <div class="metric-heading">
-                            <span>Relative Relief</span>
-                            <span id="elevationValue">--</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="elevationBar"></div>
-                        </div>
+                <div class="notice" id="notice" role="alert" hidden>
+                    <svg class="notice__icon" aria-hidden="true"><use href="#i-alert"/></svg>
+                    <div class="notice__body">
+                        <p class="notice__title" id="noticeTitle"></p>
+                        <p class="notice__message" id="noticeMessage"></p>
                     </div>
-
-                    <div class="metric">
-                        <div class="metric-heading">
-                            <span>Surface Roughness</span>
-                            <span id="roughnessValue">--</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="roughnessBar"></div>
-                        </div>
-                    </div>
-
-                    <div class="metric">
-                        <div class="metric-heading">
-                            <span>Slope Distribution</span>
-                            <span id="slopeValue">--</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="slopeBar"></div>
-                        </div>
-                    </div>
-
-                    <div class="metric">
-                        <div class="metric-heading">
-                            <span>Environmental Similarity</span>
-                            <span id="environmentValue">N/A</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="environmentBar"></div>
-                        </div>
-                    </div>
-
-                </article>
-
-            </div>
-        </section>
-
-
-        <section class="profiles-section" hidden>
-
-            <div class="section-heading">
-                <div>
-                    <p class="section-number">03 / SLOPE ANALYSIS</p>
-                    <h2>Slope Distribution</h2>
                 </div>
             </div>
+        </section>
 
-            <div class="profile-grid">
+        <!-- D. Terrain comparison -->
+        <section class="band band--warm" id="compare" aria-labelledby="compareTitle">
+            <div class="container">
+                <div class="section-head">
+                    <p class="eyebrow eyebrow--section">01 · Terrain</p>
+                    <h2 class="section-title" id="compareTitle">Two worlds, side by side</h2>
+                    <p class="section-lead" id="extentNote">Each image is labelled with the ground area it shows. The two previews are not drawn at the same scale.</p>
+                </div>
 
-                <article class="panel profile-panel">
-                    <span class="planet-tag mars-tag">MARS</span>
-                    <h3>Gale Crater Slope Distribution</h3>
-                    <div class="slope-chart" id="marsChart"></div>
-                </article>
+                <div class="terrain-grid">
+                    <article class="terrain" id="marsPanel" aria-labelledby="marsTitle">
+                        <header class="terrain__head">
+                            <p class="tag tag--mars"><span class="tag__dot" aria-hidden="true"></span>Mars reference</p>
+                            <h3 class="terrain__title" id="marsTitle">Gale Crater</h3>
+                            <p class="terrain__coords mono" title="Centre from the verified reference metadata">5.44° S · 137.70° E</p>
+                        </header>
+                        <figure class="figure">
+                            <div class="frame frame--paper" id="marsFrame">
+                                <img class="frame__img" id="marsPreview" alt="Elevation preview of the Gale Crater reference on Mars (NASA MOLA)" hidden>
+                                <div class="frame__placeholder" id="marsPlaceholder">
+                                    <span class="skeleton" aria-hidden="true"></span>
+                                    <span class="frame__note" id="marsPlaceholderText">Loading reference preview…</span>
+                                </div>
+                            </div>
+                            <figcaption class="figure__bar">
+                                <span class="figure__caption">Full reference crop · <span class="mono">≈100 km</span> across</span>
+                                <button type="button" class="frame__expand" id="marsExpand" data-expand="marsPreview" hidden>
+                                    <svg aria-hidden="true"><use href="#i-expand"/></svg><span>Enlarge</span>
+                                </button>
+                            </figcaption>
+                        </figure>
+                        <dl class="facts">
+                            <div><dt>Dataset</dt><dd id="marsDataset">—</dd></div>
+                            <div><dt>Grid spacing</dt><dd class="mono">463 m</dd></div>
+                            <div><dt>Effective resolution</dt><dd id="marsEffective">—</dd></div>
+                        </dl>
+                    </article>
 
-                <article class="panel profile-panel">
-                    <span class="planet-tag earth-tag">EARTH</span>
-                    <h3>Earth Region Slope Distribution</h3>
-                    <div class="slope-chart" id="earthChart"></div>
-                </article>
-
+                    <article class="terrain" id="earthPanel" aria-labelledby="earthTitle">
+                        <header class="terrain__head">
+                            <p class="tag tag--earth"><span class="tag__dot" aria-hidden="true"></span>Earth terrain</p>
+                            <h3 class="terrain__title" id="earthTitle">Your elevation model</h3>
+                            <p class="terrain__coords mono" id="earthSubtitle">User-uploaded DEM</p>
+                        </header>
+                        <figure class="figure">
+                            <div class="frame" id="earthFrame" data-state="empty">
+                                <img class="frame__img" id="earthPreview" alt="Shaded-relief preview of the analysed Earth elevation model" hidden>
+                                <div class="frame__placeholder frame__empty" id="earthEmpty">
+                                    <svg class="empty__mark" aria-hidden="true"><use href="#ta-star"/></svg>
+                                    <p class="empty__title" id="earthEmptyTitle">No Earth terrain yet</p>
+                                    <p class="empty__text" id="earthEmptyText">Upload a GeoTIFF above. Its shaded relief appears here after analysis.</p>
+                                </div>
+                                <div class="frame__loading" id="earthLoading" hidden>
+                                    <span class="scanline" aria-hidden="true"></span>
+                                    <svg class="loading__mark" aria-hidden="true"><use href="#ta-star"/></svg>
+                                    <p class="empty__title">Analyzing terrain…</p>
+                                    <p class="empty__text">Harmonizing both elevation models to a common ground resolution, then measuring relief, slope and roughness.</p>
+                                </div>
+                            </div>
+                            <figcaption class="figure__bar">
+                                <span class="figure__caption" id="earthCaption">Preview of the compared window appears after analysis</span>
+                                <button type="button" class="frame__expand" id="earthExpand" data-expand="earthPreview" hidden>
+                                    <svg aria-hidden="true"><use href="#i-expand"/></svg><span>Enlarge</span>
+                                </button>
+                            </figcaption>
+                        </figure>
+                        <dl class="facts">
+                            <div><dt>File</dt><dd id="earthFile">—</dd></div>
+                            <div><dt>Size</dt><dd class="mono" id="earthSize">—</dd></div>
+                            <div><dt>Status</dt><dd id="earthStatus">Awaiting upload</dd></div>
+                        </dl>
+                    </article>
+                </div>
             </div>
         </section>
 
-        <section class="panel" id="sciencePanel" hidden>
-            <h3>Scientific interpretation and warnings</h3>
-            <p id="referenceMetadata"></p>
-            <p>Earth data: user-uploaded DEM. Mars source: NASA MOLA. Scores describe terrain geometry only, not environmental similarity, habitability, safety or construction suitability. Results depend on resolution, study area and methodology.</p>
-            <ul id="warningsList"></ul>
+        <!-- E–G. Results: only revealed after a successful real analysis -->
+        <section class="results" id="results" aria-labelledby="resultsTitle" hidden>
+            <div class="container">
+                <div class="section-head section-head--row">
+                    <div>
+                        <p class="eyebrow eyebrow--section">02 · Results</p>
+                        <h2 class="section-title" id="resultsTitle" tabindex="-1">Terrain similarity</h2>
+                    </div>
+                    <p class="badge badge--demo" id="mockBadge" hidden>Demo data — not a scientific result</p>
+                </div>
+
+                <div class="summary reveal" style="--i:0">
+                    <div class="score">
+                        <p class="score__label">Terrain similarity</p>
+                        <p class="score__value" id="scoreValue" aria-describedby="scoreCaption">
+                            <span class="score__number" id="similarityScore">—</span><span class="score__max">/ 100</span>
+                        </p>
+                        <p class="score__caption" id="scoreCaption">Experimental terrain similarity index. It compares terrain geometry only and is not a probability, a habitability assessment or a landing-site rating.</p>
+                    </div>
+                    <dl class="comparison" aria-label="What was compared">
+                        <div><dt>Mars reference</dt><dd id="cmpReference">—</dd></div>
+                        <div><dt>Earth DEM</dt><dd id="cmpEarth">—</dd></div>
+                        <div><dt>Compared window</dt><dd class="mono" id="cmpWindow">—</dd></div>
+                        <div><dt>Common grid</dt><dd class="mono" id="cmpGrid">—</dd></div>
+                    </dl>
+                </div>
+
+                <ol class="metrics" aria-label="Score components">
+                    <li class="metric reveal" style="--i:1">
+                        <p class="metric__name">Relative relief</p>
+                        <p class="metric__value"><span class="mono" id="reliefValue">—</span><span class="metric__max">/ 100</span></p>
+                        <span class="scale" aria-hidden="true"><span class="scale__marker" id="reliefMarker"></span></span>
+                        <p class="metric__desc">How closely the local height ranges match: highest minus lowest point within 5 × 5-cell windows.</p>
+                    </li>
+                    <li class="metric reveal" style="--i:2">
+                        <p class="metric__name">Slope distribution</p>
+                        <p class="metric__value"><span class="mono" id="slopeValue">—</span><span class="metric__max">/ 100</span></p>
+                        <span class="scale" aria-hidden="true"><span class="scale__marker" id="slopeMarker"></span></span>
+                        <p class="metric__desc">How closely the mix of gentle and steep ground matches, from slope angles in degrees.</p>
+                    </li>
+                    <li class="metric reveal" style="--i:3">
+                        <p class="metric__name">Surface roughness</p>
+                        <p class="metric__value"><span class="mono" id="roughnessValue">—</span><span class="metric__max">/ 100</span></p>
+                        <span class="scale" aria-hidden="true"><span class="scale__marker" id="roughnessMarker"></span></span>
+                        <p class="metric__desc">How closely small-scale bumpiness matches, after removing the local tilt of the ground.</p>
+                    </li>
+                </ol>
+
+                <section class="chart-card reveal" style="--i:4" aria-labelledby="chartTitle">
+                    <div class="chart-card__head">
+                        <div>
+                            <h3 class="chart-card__title" id="chartTitle">Slope distribution</h3>
+                            <p class="chart-card__sub" id="chartSub">Share of valid cells in each slope range, in degrees.</p>
+                        </div>
+                        <ul class="legend" aria-label="Legend">
+                            <li><span class="legend__swatch legend__swatch--mars" aria-hidden="true"></span><span id="legendMars">Mars · Gale Crater</span></li>
+                            <li><span class="legend__swatch legend__swatch--earth" aria-hidden="true"></span>Earth · your DEM</li>
+                        </ul>
+                    </div>
+                    <div class="chart" id="slopeChart">
+                        <div class="chart__tooltip" id="chartTooltip" role="presentation" hidden></div>
+                    </div>
+                    <p class="chart-card__note">Ranges have unequal widths, as defined by the analysis engine.</p>
+                    <details class="disclosure disclosure--plain">
+                        <summary><span>View as a table</span><svg class="disclosure__chevron" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+                        <div class="table-wrap">
+                            <table class="data-table">
+                                <caption class="sr-only">Slope distribution, share of valid cells per slope range</caption>
+                                <thead><tr><th scope="col">Slope range</th><th scope="col">Mars</th><th scope="col">Earth</th></tr></thead>
+                                <tbody id="slopeTableBody"></tbody>
+                            </table>
+                        </div>
+                    </details>
+                </section>
+
+                <details class="disclosure limitations reveal" style="--i:5" id="limitations">
+                    <summary>
+                        <span class="limitations__summary">
+                            <svg class="limitations__icon" aria-hidden="true"><use href="#i-info"/></svg>
+                            <span>Methodology &amp; limitations</span>
+                            <span class="count" id="warningCount">0</span>
+                        </span>
+                        <svg class="disclosure__chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+                    </summary>
+                    <div class="limitations__body">
+                        <p class="limitations__intro">Notes returned by the analysis engine for this comparison:</p>
+                        <ul class="warnings" id="warningsList"></ul>
+                        <div class="limitations__static">
+                            <p id="referenceMetadata"></p>
+                            <p>Earth data is the uploaded DEM; Mars data is NASA MOLA. Scores describe terrain geometry only. They do not indicate environmental similarity, habitability, safety or construction suitability, and they depend on resolution, study area and methodology.</p>
+                        </div>
+                    </div>
+                </details>
+
+                <div class="results__footer">
+                    <button type="button" class="btn btn--secondary" id="newAnalysisBtn">
+                        <svg class="btn__icon" aria-hidden="true"><use href="#i-arrow-up"/></svg>
+                        <span class="btn__label">Analyze another DEM</span>
+                    </button>
+                </div>
+            </div>
         </section>
-
-        <footer>
-            <span>TERRA ANALOG</span>
-            <span>EARTH TERRAIN / PLANETARY COMPARISON</span>
-        </footer>
-
     </main>
+
+    <footer class="site-footer">
+        <div class="container site-footer__inner">
+            <div class="site-footer__brand">
+                <svg class="brand__mark brand__mark--sm" aria-hidden="true"><use href="#ta-star"/></svg>
+                <span><strong>Terra Analog</strong> · Planetary Terrain Analysis</span>
+            </div>
+            <p class="site-footer__note">Research prototype. Similarity describes terrain geometry only.</p>
+            <button type="button" class="link-button" id="aboutBtn">About Terra Analog</button>
+        </div>
+    </footer>
+
+    <dialog class="dialog" id="aboutDialog" aria-labelledby="aboutTitle">
+        <div class="dialog__head">
+            <svg class="brand__mark" aria-hidden="true"><use href="#ta-star"/></svg>
+            <h2 class="dialog__title" id="aboutTitle">About Terra Analog</h2>
+        </div>
+        <div class="dialog__body">
+            <p>Terra Analog compares the shape of an Earth landscape with a fixed Mars reference: the Gale Crater region, explored by NASA's Curiosity rover.</p>
+            <h3>Data</h3>
+            <p>Mars elevations come from the NASA Mars Global Surveyor MOLA gridded topography (MEGDR). Earth elevations come from the GeoTIFF you upload. The file is processed for the request only.</p>
+            <h3>How it compares</h3>
+            <p>Both models are brought to the same ground resolution and the same window size. The engine then compares the distributions of local relief, slope and surface roughness, and combines them into a 0–100 index.</p>
+            <h3>Limitations</h3>
+            <p>The methodology is provisional and uncalibrated. A high index means similar terrain geometry at the compared scale. It is not a probability and says nothing about habitability, safety or suitability for exploration.</p>
+        </div>
+        <form method="dialog" class="dialog__foot"><button class="btn btn--secondary btn--sm" value="close">Close</button></form>
+    </dialog>
+
+    <dialog class="dialog dialog--image" id="lightbox" aria-labelledby="lightboxTitle">
+        <div class="dialog__head">
+            <h2 class="dialog__title" id="lightboxTitle">Preview</h2>
+            <form method="dialog"><button class="btn btn--secondary btn--sm" value="close">Close</button></form>
+        </div>
+        <img class="lightbox__img" id="lightboxImg" alt="">
+        <p class="lightbox__caption" id="lightboxCaption"></p>
+    </dialog>
 
     <script src="config.js"></script>
     <script src="script.js"></script>
-
 </body>
 </html>

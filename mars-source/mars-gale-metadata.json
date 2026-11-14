@@ -1,0 +1,53 @@
+{
+    "dataset": "MOLA Gale Crater DEM",
+    "source": "NASA MGS MOLA MEGDR MEG128",
+    "source_file": "megt00n090hb.img",
+    "source_label": "megt00n090hb.xml",
+    "planet": "Mars",
+    "region": "Gale Crater",
+    "center": {
+        "latitude_planetocentric": -5.44,
+        "longitude_positive_east": 137.7
+    },
+    "elevation": {
+        "unit": "metres",
+        "reference": "GMM3 Mars areoid",
+        "minimum": -4623,
+        "maximum": 787,
+        "mean": -2816.1769812857724,
+        "source_data_type": "Signed 16-bit integer",
+        "byte_order": "Big-endian",
+        "scale_factor": 1
+    },
+    "raster": {
+        "width": 216,
+        "height": 216,
+        "resolution_metres": [
+            463.0576672,
+            463.0576672
+        ],
+        "crop_size_requested_km": 100,
+        "nodata": 0.0,
+        "valid_pixels": 46649,
+        "nodata_pixels": 7
+    },
+    "coordinate_system": {
+        "projection": "Mars Equirectangular",
+        "central_meridian_degrees": 180,
+        "mars_radius_metres": 3396000,
+        "crs_wkt": "PROJCS[\"Mars_simpCyl_c180\",GEOGCS[\"GCS_Unknown\",DATUM[\"D_Unknown\",SPHEROID[\"S_Unknown\",3396000,0]],PRIMEM[\"Greenwich\",0],UNIT[\"Degree\",0.0174532925199433]],PROJECTION[\"Equirectangular\"],PARAMETER[\"standard_parallel_1\",0],PARAMETER[\"central_meridian\",180],PARAMETER[\"false_easting\",0],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH]]"
+    },
+    "processing": [
+        "Read original NASA MOLA elevation raster",
+        "Converted Gale Crater coordinates to projected metres",
+        "Extracted a centred approximately 100 km crop",
+        "Preserved original elevation values",
+        "Preserved Mars coordinate reference system",
+        "Exported numerical GeoTIFF"
+    ],
+    "data_quality_notes": [
+        "NASA describes the grid values as median observed topography, with interpolated values supplied where observations are absent.",
+        "Zero values are treated as NoData according to the ENVI header.",
+        "The source does not provide a separate per-pixel observation mask."
+    ]
+}
