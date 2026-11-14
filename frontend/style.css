@@ -1416,6 +1416,14 @@ body:not([data-phase="idle"]) .selection__hint {
     aspect-ratio: 7 / 5;
 }
 
+/* References differ in preview style (Gale: white-canvas plot; Amazonis and the
+   Moon: full-bleed relief), so letterbox every preview on the same dark ground
+   instead of the white paper that suited only Gale. */
+.terrain .frame--paper {
+    background: #050B18;
+    box-shadow: inset 0 0 0 1px var(--line-soft);
+}
+
 /* Pin previews to the frame box so `object-fit: contain` letterboxes instead of
    the image overflowing the grid row and being cropped by overflow: hidden. */
 .terrain .frame__img {

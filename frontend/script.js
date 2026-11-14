@@ -26,6 +26,13 @@
         EFFECTIVE_RESOLUTION_UNVERIFIED: 'Reference effective resolution unverified',
         REFERENCE_LIMITATION: 'Reference limitation',
         VERTICAL_UNITS_ASSUMED: 'Elevation units assumed',
+        // Methodology 0.3 codes
+        DESCRIPTOR_SIMILARITY_ONLY: 'Descriptor similarity only',
+        CROSS_REFERENCE_SCALE_CAUTION: 'Scale caution across references',
+        SOFT_HISTOGRAM_SCORING: 'Soft histogram scoring',
+        ELEVATION_ENCODING_APPLIED: 'Elevation encoding decoded',
+        REFERENCE_FLAT_TERRAIN: 'Reference terrain essentially flat',
+        LOW_INFORMATION_TERRAIN: 'Low-information terrain',
         RESOLUTION_REDUCED: 'Earth detail reduced',
         EARTH_COARSER_THAN_REFERENCE: 'Earth DEM coarser than reference',
         FOOTPRINT_LIMITED_BY_EARTH: 'Comparison area limited by the Earth DEM',
@@ -41,14 +48,16 @@
     const SCIENTIFIC_NOTES = [
         {
             kind: 'terrain',
-            codes: ['FLAT_TERRAIN', 'LOW_INFORMATION_TERRAIN'],
+            codes: ['FLAT_TERRAIN', 'REFERENCE_FLAT_TERRAIN', 'LOW_INFORMATION_TERRAIN'],
             title: 'Flat or low-information terrain can produce misleadingly high similarity.',
         },
         {
             kind: 'scale',
-            // RESOLUTION_REDUCED is deliberately excluded: it accompanies almost every
-            // analysis (routine downsampling) and would make this note ever-present.
-            codes: ['CROSS_REFERENCE_SCALE_CAUTION', 'FOOTPRINT_LIMITED_BY_EARTH', 'EARTH_COARSER_THAN_REFERENCE'],
+            // Triggered only by analysis-specific scale signals. RESOLUTION_REDUCED and
+            // CROSS_REFERENCE_SCALE_CAUTION accompany (almost) every analysis, so they
+            // never trigger the note; the general caution is attached when it shows.
+            codes: ['FOOTPRINT_LIMITED_BY_EARTH', 'EARTH_COARSER_THAN_REFERENCE'],
+            related: ['CROSS_REFERENCE_SCALE_CAUTION'],
             title: 'Scores obtained at different physical scales should not be directly ranked.',
         },
         {
@@ -1259,8 +1268,13 @@
         const items = [];
 
         for (const note of SCIENTIFIC_NOTES) {
-            const matches = warnings.filter((w) => note.codes.includes(w.code));
-            if (!matches.length) continue;
+            const triggers = warnings.filter((w) => note.codes.includes(w.code));
+            if (!triggers.length) continue;
+
+            const matches = [
+                ...triggers,
+                ...warnings.filter((w) => note.related?.includes(w.code)),
+            ];
 
             const li = document.createElement('li');
             li.className = 'sci-notes__item';
