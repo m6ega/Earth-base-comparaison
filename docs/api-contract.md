@@ -1,62 +1,122 @@
 # API contract
 
-No endpoint is implemented. Implementation starts November 14, 2026.
+**Version:** draft 0.2 (Phase 0). **Status:** endpoints and request fields are approved. The response fields for previews, chart data, warnings and reference metadata are a proposal that is **pending review by the Frontend & Data Lead** before final approval.
 
-## Approved decisions
+No endpoint is implemented yet. Scope and decisions: [PROJECT-CONTEXT.md](../PROJECT-CONTEXT.md).
 
-### Endpoint and request
+## Approved endpoints
 
-- Endpoint: `POST /analyze`.
-- Request fields:
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | Liveness check |
+| `GET` | `/references` | List the prepared Mars references the user can select |
+| `POST` | `/analyze` | Compare one uploaded Earth GeoTIFF with one Mars reference |
+
+### `POST /analyze` request
+
+`multipart/form-data`:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `file` | File | One Earth DEM GeoTIFF |
-| `planet` | String | `mars` or `moon` |
-| `reference_id` | String | Identifier of a selected, prepared planetary reference |
+| `file` | File | One Earth elevation GeoTIFF |
+| `reference_id` | String | `id` of a reference returned by `GET /references` |
 
-- The backend analyzes terrain using relative relief, slope distribution and surface roughness. Terrain morphology is deferred beyond the MVP.
+The previous `planet` field is removed. The MVP is Mars only.
 
-### MVP mock responses
+## Common schema
 
-The mock response files below define the MVP response shape for frontend and backend integration:
+All JSON examples in [data/examples/](../data/examples/) use exactly this schema.
 
-- Success: [data/examples/analyze-success.json](../data/examples/analyze-success.json)
-- Error: [data/examples/analyze-error.json](../data/examples/analyze-error.json)
+### Reference object
 
-Success response:
+Used in `GET /references` and in the `POST /analyze` success response.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `id` | String | Stable reference identifier, used as `reference_id` |
+| `name` | String | Display name, for example `Gale Crater` |
+| `dataset` | String | Source dataset label. Exact product details live in [data/README.md](../data/README.md) |
+| `effective_resolution_m` | Number or `null` | Effective horizontal resolution in metres; `null` until verified |
+| `preview_url` | String | Mars terrain preview image (see [Preview images](#preview-images)) |
+
+### Warning object
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `code` | String | Machine-readable code |
+| `message` | String | Human-readable explanation for display |
+
+Warnings qualify a completed result, for example limited valid coverage or a resolution difference. Errors mean that no result was produced. The full list of warning codes is unresolved.
+
+### `is_mock` flag
+
+Every `GET /references` and `POST /analyze` success response has a boolean `is_mock`.
+
+- `false`: values were calculated by the backend from real data.
+- `true`: values are mock or demo data. Clients must label them visibly as mock data and never present them as scientific results.
+
+All files in `data/examples/` have `is_mock: true`. They are test fixtures only.
+
+## Responses
+
+### `GET /health`
+
+`200`:
+
+```json
+{ "status": "ok" }
+```
+
+Fixture: [health.json](../data/examples/health.json).
+
+### `GET /references`
+
+`200`:
 
 ```json
 {
-  "status": "success",
-  "planet": "mars",
-  "reference": {
-    "id": "mars-demo-01",
-    "name": "Mars Demo Reference"
-  },
-  "total_similarity": 0.78,
-  "scores": {
-    "relative_relief": 0.82,
-    "slope_distribution": 0.75,
-    "surface_roughness": 0.77
-  },
-  "warnings": []
+  "is_mock": true,
+  "references": [
+    {
+      "id": "mars-gale",
+      "name": "Gale Crater",
+      "dataset": "NASA MGS MOLA",
+      "effective_resolution_m": null,
+      "preview_url": "/static/references/mars-gale/preview.png"
+    }
+  ]
 }
 ```
+
+Fixture: [references.json](../data/examples/references.json). Gale Crater is the required reference. Gusev Crater appears only after it is prepared. The `mars-gale` identifier is proposed.
+
+### `POST /analyze` success
+
+`200`:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `status` | String | `success` |
-| `planet` | String | Echo of the requested `planet` |
-| `reference.id` | String | Echo of the requested `reference_id` |
-| `reference.name` | String | Display name of the prepared reference |
-| `total_similarity` | Number | Overall terrain similarity, `0`–`1` |
-| `scores.relative_relief` | Number | Per-metric similarity, `0`–`1` |
-| `scores.slope_distribution` | Number | Per-metric similarity, `0`–`1` |
-| `scores.surface_roughness` | Number | Per-metric similarity, `0`–`1` |
-| `warnings` | Array | Conditions that qualify the result; always present, empty when none. The schema of a non-empty warning entry is unresolved |
+| `is_mock` | Boolean | See [`is_mock` flag](#is_mock-flag) |
+| `reference` | Reference object | The selected Mars reference |
+| `total_similarity` | Number | Overall geometric similarity, `0`–`1` |
+| `scores.relative_relief` | Number | `0`–`1` |
+| `scores.slope_distribution` | Number | `0`–`1` |
+| `scores.surface_roughness` | Number | `0`–`1` |
+| `earth_preview_url` | String | Earth terrain preview image (see [Preview images](#preview-images)) |
+| `charts.slope_distribution.unit` | String | Slope unit, `degrees` |
+| `charts.slope_distribution.bin_edges` | Number array | `n + 1` bin edges |
+| `charts.slope_distribution.earth` | Number array | `n` values: fraction of valid Earth cells per bin, summing to about 1 |
+| `charts.slope_distribution.mars` | Number array | `n` values, the same for the Mars reference |
+| `warnings` | Warning object array | Always present; empty when there are none |
 
-Error response:
+The Mars preview is `reference.preview_url`. There is no separate Mars preview field.
+
+Fixture: [analyze-success.json](../data/examples/analyze-success.json). All numbers in it, including bin edges, are illustrative.
+
+### Error
+
+Any endpoint may return:
 
 ```json
 {
@@ -71,52 +131,54 @@ Error response:
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `status` | String | `error` |
-| `error.code` | String | Machine-readable error code |
+| `error.code` | String | Machine-readable code |
 | `error.message` | String | Human-readable explanation for display |
 
-### Score convention
+Fixture: [analyze-error.json](../data/examples/analyze-error.json).
 
-- `total_similarity` and all three `scores` are mandatory in every successful MVP response.
-- The `0`–`1` range for `total_similarity` and `scores` is an MVP API convention for display and integration, not an approved scientific formula.
-- `1.0` represents maximum terrain similarity and `0.0` minimum terrain similarity. This is an MVP interface convention, not a scientifically validated calculation.
-- Scores measure geometric terrain similarity only. They do not indicate habitability or base suitability.
-- All numeric values in the mock files are illustrative. They are not results from any dataset and must not be presented as scientific findings.
-- How per-metric scores are calculated and how they combine into `total_similarity` (weights, normalization, distance functions) is not approved. See [methodology](methodology.md).
-- A score is not a probability and does not establish physical analogy or mission suitability.
+## Preview images
 
-### Deferred optional features
+Clients use both preview URL fields directly as an image source (`<img src>`). They are opaque strings, so clients must not construct or parse them.
 
-Earth aridity and lithology are **not approved for the MVP**. They are deferred optional features that require separate approval before being added to the API. The MVP responses contain no enrichment fields. If they are approved later, they must not contribute to the terrain similarity score, and missing data for them must not block terrain analysis.
+Proposal for the backend implementation:
 
-## Proposals for both leads to review
+- **Mars preview** (`reference.preview_url`): a PNG generated once per reference during reference preparation. It is served by FastAPI as a static file under `/static/references/{id}/preview.png`, a path relative to the API base URL. This is a static file mount, not an additional API endpoint.
+- **Earth preview** (`earth_preview_url`): a PNG rendered from the uploaded DEM during `POST /analyze` and returned inline as a `data:image/png;base64,...` URL. The upload then need not be stored after the request, and no further endpoint is needed.
+
+Preview size, colour map and hillshading are unresolved.
+
+## Score convention
+
+- `total_similarity` and all three `scores` are mandatory in every success response.
+- `0`–`1` is an API convention: `1.0` is maximum and `0.0` minimum geometric terrain similarity. It is not a validated scientific calculation, and the formula, normalization and weights are not approved (see [methodology](methodology.md)).
+- Scores are not probabilities and do not indicate habitability or base suitability.
+
+## Proposals for review
 
 ### Request handling
 
-Use `multipart/form-data`. Validate that `reference_id` exists among prepared references and belongs to the selected `planet`. Do not accept arbitrary server paths or remote download URLs as reference identifiers.
-
-HTTP `200` after synchronous processing is a candidate design. If resource estimates require asynchronous jobs, revise this contract jointly before implementation.
+Reject a `reference_id` that is not in the prepared reference list. Never accept server paths or remote URLs as references. HTTP `200` after synchronous processing is the candidate design. If processing cost requires asynchronous jobs, revise this contract jointly first.
 
 ### HTTP status codes for errors
 
 | Status | Intended use |
 | --- | --- |
-| `400` | Unknown `reference_id` or inconsistent `planet`/`reference_id` pair |
+| `400` | Unknown `reference_id` |
 | `413` | Upload exceeds the agreed limit |
 | `415` | Unsupported file format |
 | `422` | Missing fields or unusable elevation data, for example `INVALID_DEM` |
 | `500` | Unexpected processing failure |
 
-Agree on whether framework validation errors are normalized into the error response shape. Avoid exposing internal paths or stack traces. Warnings indicate qualified results; errors indicate that analysis could not be completed.
+Decide whether FastAPI validation errors are normalized into the error shape. Never expose internal paths or stack traces.
 
 ## Unresolved details
 
-- Upload size, dimensions, band requirements and resource/time limits.
-- CRS, elevation units, NoData handling and minimum usable coverage.
-- `reference_id` naming, how available references reach the frontend, and versioning.
-- Synchronous execution feasibility and timeout behavior.
-- Score calculation, weights, numeric precision and visualization needs.
-- Full list of error codes and the HTTP status for each.
-- Schema of non-empty `warnings` entries (`warnings` stays an array; the mock shows only an empty one).
-- CORS/deployment configuration and retention policy.
+- Upload size, dimensions, band requirements and time limits.
+- CRS, vertical units, NoData handling and minimum valid coverage.
+- Final `reference_id` naming and versioning.
+- Slope bin edges, preview rendering and numeric precision.
+- Full lists of error and warning codes and their HTTP statuses.
+- Whether responses carry a methodology or reference-data version.
+- CORS, deployment and upload retention.
 
-See [architecture](architecture.md), [methodology](methodology.md), and [data plan](../data/README.md).
+See [architecture](architecture.md), [methodology](methodology.md) and the [data plan](../data/README.md).

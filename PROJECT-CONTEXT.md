@@ -1,156 +1,168 @@
 # Project Context — Terra Analog
 
+This file is the authoritative source for approved
+project decisions. Other documents link here instead
+of restating these decisions. If another document
+conflicts with this file, this file wins; report the
+conflict.
+
 ## Project Goal
 
-Build a web application that compares terrain
-characteristics of Earth locations with selected
-reference regions on Mars or the Moon.
+Build a web application that compares the terrain
+geometry of an uploaded Earth elevation model with
+a selected NASA Mars reference region.
 
-## Product Scope
+## MVP Scope
 
-Users upload one Earth DEM file (GeoTIFF) and select
-a planet and a prepared planetary reference.
+- Users upload one Earth elevation GeoTIFF and select
+  one prepared Mars reference.
+- Mars references come from NASA Mars Orbiter Laser
+  Altimeter (MOLA) elevation data.
+- Mars only. The Moon is out of scope for the MVP.
+- Gale Crater is the required primary reference.
+- Gusev Crater is optional and is added only after
+  the first working comparison.
+- No global Earth scanning.
 
-The application processes both datasets
-and calculates terrain similarity.
+The Gale Crater reference (`mars-gale`) is prepared
+and its source and geospatial metadata are recorded
+in `backend/references/mars-gale/metadata.json`.
+Gusev Crater is not prepared; see data/README.md.
 
-No global Earth scanning.
+## Stack
 
-## Architecture
+- Frontend: React + Vite
+- Backend: Python + FastAPI
+- Geospatial processing: Rasterio + NumPy
+- SciPy is optional, not a mandatory dependency.
 
-- React frontend
-- FastAPI backend
-- Rasterio for DEM processing
-- NumPy and SciPy for numerical calculations
+Package versions, deployment and hosting are not
+yet selected.
 
-## Backend Responsibilities
-
-- File validation
-- DEM preprocessing
-- Resolution harmonization
-- Terrain feature extraction
-- Similarity calculations
-- Validation, preparation, storage and integration
-  of planetary reference data
-- API responses
-
-## Frontend Responsibilities
-
-- User interface
-- Planet selection
-- Reference selection
-- DEM upload
-- Results visualization
-- Error and warning display
-
-## Terrain Metrics
-
-MVP terrain similarity metrics:
+## Metrics
 
 1. Relative relief
 2. Slope distribution
 3. Surface roughness
+4. Overall geometric similarity score
+   (`total_similarity`), derived from the three
+   metric scores
 
-Future extension (deferred beyond the MVP):
+Scores use a 0–1 range as an API convention:
+`1.0` is maximum and `0.0` minimum terrain
+similarity. Formulas, normalization and weights are
+not approved; see docs/methodology.md.
 
-4. Terrain morphology (for example, a topographic
-   position index, TPI)
+Deferred beyond the MVP: terrain morphology (for
+example, TPI). Earth aridity and lithology are
+deferred optional features that require separate
+approval; if approved later, they must not
+contribute to the similarity score, and missing data
+for them must not block terrain analysis.
 
-Terrain morphology was part of the initial metric list.
-It remains scientifically relevant but is not part of
-the MVP similarity score.
+## Scientific Meaning
 
-## Deferred Optional Features
+- Scores describe terrain geometry similarity only.
+  They do not indicate habitability, base
+  suitability, environmental equivalence or mission
+  suitability, and they are not probabilities.
+- Earth and Mars data must not be treated as
+  directly comparable until physical extent,
+  effective resolution, coordinate systems, vertical
+  units and NoData handling have been checked.
+  Unresolved comparability issues are reported as
+  warnings.
 
-Earth aridity and lithology are not approved for the MVP.
-They are deferred optional features that require
-separate approval.
+## Data Ownership
 
-If approved later:
-
-- They must not contribute to the terrain similarity score.
-- Missing data for them must not block terrain analysis.
+- The backend stores and processes Mars GeoTIFFs.
+  It owns the Mars DEM and the reference metadata,
+  stored under `backend/references/<reference_id>/`
+  (`dem.tif`, `preview.png`, `metadata.json`).
+- The backend serves the prepared Mars preview to
+  the frontend. The frontend does not store or
+  analyze the Mars DEM.
+- Source provenance for a reference comes from its
+  verified `metadata.json`, not from assumptions.
+- Mars terrain features may be precomputed and
+  cached on the backend.
+- Cached Mars features must be recomputed whenever
+  metric definitions or the processing scale change.
+- The frontend performs no scientific calculations.
+  It displays backend results.
+- Large raw DEM files (including raw NASA source
+  files), uploads and generated rasters are excluded
+  from Git. The one exception is the small validated
+  `backend/references/mars-gale/dem.tif`; see
+  data/README.md.
 
 ## API
 
-POST /analyze
+MVP endpoints: `GET /health`, `GET /references` and
+`POST /analyze`. `POST /analyze` accepts `file`
+(Earth GeoTIFF) and `reference_id` (Mars reference).
+There is no `planet` field. The MVP interface shows
+only the Gale Crater reference, with no selector;
+see docs/ui-concept.md.
 
-Request fields: `file` (one Earth DEM GeoTIFF),
-`planet` (`mars` or `moon`), `reference_id`
-(selected prepared planetary reference).
+docs/api-contract.md defines the response schema.
+The frontend-facing fields there are pending review
+by the Frontend & Data Lead. Files in data/examples/
+are mock test fixtures only, never scientific
+results.
 
-MVP response fields: `status`, `planet`,
-`reference` (`id`, `name`), `total_similarity`,
-`scores` (`relative_relief`, `slope_distribution`,
-`surface_roughness`) and `warnings`.
-Errors return `status` and `error` (`code`, `message`).
+## Responsibilities
 
-Mock responses:
-data/examples/analyze-success.json and
-data/examples/analyze-error.json.
+Backend Lead + Claude:
+- Architecture and API
+- DEM processing and metrics
+- Backend validation
+- Storage, preparation and caching of Mars
+  reference data (`backend/`)
 
-`total_similarity` and the three `scores` are
-mandatory in every successful response.
-Scores use a 0–1 range as an MVP API convention,
-not an approved scientific formula; formula,
-normalization and weights are unresolved.
-1.0 represents maximum and 0.0 minimum terrain
-similarity (interface convention, not a
-scientifically validated calculation).
-`warnings` is always an array; the schema of
-non-empty warnings is unresolved.
-Scores measure geometric terrain similarity only,
-not habitability or base suitability.
-Mock values are illustrative only.
+Frontend & Data Lead + Codex:
+- UI concept ([docs/ui-concept.md](docs/ui-concept.md))
+  and React frontend (`frontend/`)
+- NASA MOLA source research
+- Reference data provenance documentation
+  (data/README.md)
 
-See docs/api-contract.md.
-
-## Team Responsibilities
-
-Backend Lead:
-- backend/
-- Terrain processing
-- Similarity algorithm
-- API
-- Validates, prepares, stores and integrates
-  planetary reference data
-
-Frontend & Data Lead:
-- frontend/
-- User interface
-- Research of NASA planetary reference data
-- Documentation of reference data provenance
+Final decisions and all merges require human
+approval. AI agents stay within their owner's area.
 
 ## Git Workflow
 
 - `backend--dev`: backend work
 - `frontend--dev`: frontend work
-- `main`: reviewed integration
-- Pull requests target `main`.
-- Humans approve pull requests and merges.
-- AI agents never merge automatically.
+- `main`: reviewed integration; must remain runnable
+  once implementation begins
+- `docs/<topic>`: short-lived documentation branches
+- Pull requests target `main`. Humans approve pull
+  requests and merges. AI agents never merge.
+
+The mandatory phase workflow is in CONTRIBUTING.md.
 
 ## Development Rules
 
 - Keep backend and frontend responsibilities separate.
 - Follow the API contract.
-- Avoid unnecessary dependencies.
+- Avoid unnecessary dependencies and abstractions.
 - Do not rewrite working code without a reason.
-- Test changes before committing.
-- Never commit secrets or API keys.
+- Test changes and report results before each PR.
+- Never commit secrets, API keys, virtual
+  environments, node_modules or large DEMs.
 
-## AI Coding Rules
+Agent-specific rules: AGENTS.md.
 
-- Work only on the requested task.
-- Do not modify unrelated files.
-- Explain important changes.
-- Keep implementation simple.
-- Do not introduce unnecessary abstractions.
-- Follow the existing project architecture.
-- See AGENTS.md.
+## Status
 
-## Current Status
-
-Planning and preparation only.
-No application code before November 14, 2026.
-Application development starts at the hackathon.
+- Pre-hackathon preparation (before November 14,
+  2026) produced documentation only: repository
+  setup, development guidelines and an initial mock
+  API contract (PRs #1–#3). That contract allowed
+  Mars or Moon references and a `planet` field; both
+  are superseded by this revision.
+- Phase 0 (November 14, 2026): documentation and
+  architecture revision. No application code.
+- Application implementation starts in Phase 1,
+  after Phase 0 is approved and merged.

@@ -1,9 +1,12 @@
 {
   "status": "success",
-  "planet": "mars",
+  "is_mock": true,
   "reference": {
-    "id": "mars-demo-01",
-    "name": "Mars Demo Reference"
+    "id": "mars-gale",
+    "name": "Gale Crater",
+    "dataset": "NASA MGS MOLA",
+    "effective_resolution_m": null,
+    "preview_url": "/static/references/mars-gale/preview.png"
   },
   "total_similarity": 0.78,
   "scores": {
@@ -11,5 +14,19 @@
     "slope_distribution": 0.75,
     "surface_roughness": 0.77
   },
-  "warnings": []
+  "earth_preview_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "charts": {
+    "slope_distribution": {
+      "unit": "degrees",
+      "bin_edges": [0, 5, 10, 15, 20, 30, 90],
+      "earth": [0.42, 0.27, 0.14, 0.09, 0.06, 0.02],
+      "mars": [0.48, 0.24, 0.12, 0.08, 0.05, 0.03]
+    }
+  },
+  "warnings": [
+    {
+      "code": "MOCK_DATA",
+      "message": "Illustrative mock values for interface development. This is not a scientific result."
+    }
+  ]
 }
