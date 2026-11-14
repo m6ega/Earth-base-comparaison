@@ -1,34 +1,72 @@
-# Frontend preparation
+# Frontend
 
-**Status:** documentation only; implementation starts November 14, 2026.
+**Status:** no code yet. Implementation starts in Phase 1, once the readiness criteria below are met.
 
-## Approved decisions
+**Owner:** Frontend & Data Lead + Codex, on `frontend--dev`. Scope, stack and responsibilities: [PROJECT-CONTEXT.md](../PROJECT-CONTEXT.md).
 
-[Project context](../PROJECT-CONTEXT.md) assigns the Frontend & Data Lead ownership of the user interface, research of NASA planetary reference data, and documentation of its provenance. React is the planned frontend technology. Frontend work happens on `frontend--dev`, with pull requests to `main` approved by humans.
+The frontend is a React + Vite single-page application. It performs no scientific calculations; it displays what the backend returns.
 
-The interface must support planet selection, reference selection, Earth DEM upload, results visualization, and error and warning display. It sends one Earth DEM GeoTIFF to `POST /analyze` as `file`, together with `planet` (`mars` or `moon`) and `reference_id`. Global Earth scanning is outside scope.
+## Required reading
 
-Results cover three MVP terrain metrics: relative relief, slope distribution and surface roughness. A successful response always includes `total_similarity` and per-metric `scores`, each from 0 to 1, plus `warnings`; see [analyze-success.json](../data/examples/analyze-success.json) and [analyze-error.json](../data/examples/analyze-error.json). The mock values are illustrative and can be used for UI development before the backend exists.
+**Codex must read and follow [docs/ui-concept.md](../docs/ui-concept.md) and [docs/api-contract.md](../docs/api-contract.md) before implementing the frontend.** It must also read [PROJECT-CONTEXT.md](../PROJECT-CONTEXT.md), [AGENTS.md](../AGENTS.md) and [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-Scores describe geometric terrain similarity only. The interface must not present them as habitability, base suitability or a probability. Earth aridity and lithology are deferred optional features, not approved for the MVP, and are not shown.
+- UI behavior must match the approved UI specification. Significant design changes need human approval.
+- The API contract is the source of truth for backend/frontend communication. Do not change it without cross-team agreement; report conflicts instead.
+- Claude owns backend implementation. Codex owns frontend implementation.
 
-## Proposed user flow
+## Intended structure
 
-1. Select Mars or the Moon and an available prepared reference.
-2. Upload an Earth DEM GeoTIFF, with size guidance once agreed.
-3. Submit analysis and show a clear processing state.
-4. Display `total_similarity`, the three metric scores and their limitations.
-5. Present actionable errors and preserve warnings alongside results.
+A recommendation for after Phase 1 begins; do not create unused files. Use JSX or TypeScript consistently, and document the choice before implementation.
 
-Proposal: provide accessible labels, keyboard navigation, clear loading states and textual explanations alongside graphics.
+```text
+frontend/
+  package.json
+  index.html
+  src/
+    main.jsx
+    App.jsx
+    components/    Header, FileUpload, MarsReferenceCard, AnalysisLoading,
+                   ComparisonMaps, ZoomableMap, SimilaritySummary,
+                   SimilarityChart, SlopeDistributionChart, WarningsPanel,
+                   AboutModal, LanguageToggle   (.jsx)
+    services/api.js
+    i18n/translations.js
+    styles/globals.css
+    utils/formatters.js
+  public/assets/
+```
 
-## Hackathon checklist and open questions
+## Folder ownership rules
 
-- Agree on the remaining [API contract](../docs/api-contract.md) details, including error and warning presentation.
-- Select React tooling and package versions; no build system is chosen yet.
-- Decide how the list of available `reference_id` values reaches the interface; no catalog endpoint is confirmed.
-- Agree on visualization types and how 0–1 scores are displayed (for example, decimals or percentages).
-- Document provenance for researched NASA reference data in [data/README.md](../data/README.md).
-- Implement and validate the flow beginning November 14.
+- All React UI code belongs in `frontend/`.
+- API client functions: `frontend/src/services/`.
+- Translations: `frontend/src/i18n/`.
+- Styling: `frontend/src/styles/`, or another consistent, documented structure.
+- Formatting utilities: `frontend/src/utils/`.
+- Static frontend-only assets: `frontend/public/assets/`.
+- Large Mars DEM rasters and Earth DEM data do **not** belong in `frontend/`.
+- Terrain metric calculation code does **not** belong in `frontend/`.
+- Do not modify backend-owned files without permission.
 
-No application scaffold, dependencies or run commands exist yet. See [architecture](../docs/architecture.md) and [contribution rules](../CONTRIBUTING.md).
+## Phase 1 readiness
+
+Codex may begin frontend implementation when:
+
+1. Phase 0 documentation is approved and merged.
+2. The UI concept has been reviewed by the Frontend & Data Lead.
+3. The API contract is approved by both sides.
+4. `frontend--dev` is synchronized with `main`.
+
+Phase 1 initial frontend work:
+
+- Scaffold React + Vite.
+- Build the header and upload layout.
+- Implement EN/RU localization.
+- Connect to `GET /health`.
+- Build a basic mock-supported UI for integration testing, labelled with the DEMO / MOCK DATA indicator.
+
+Upload, terrain maps, charts and the full results view belong to later phases. Do not build them early without explicit approval from the human developers. All work follows the [phase workflow](../CONTRIBUTING.md#phase-workflow-mandatory).
+
+## Data research (Frontend & Data Lead + Codex)
+
+Research the NASA MOLA source for Gale Crater and record its provenance in [data/README.md](../data/README.md). Record only verified values.

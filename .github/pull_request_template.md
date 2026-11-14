@@ -1,35 +1,35 @@
 ## Purpose
 
-Describe the problem, resulting change and related issue.
+Describe the problem, the resulting change and the related issue.
 
-## Branch
+## Branch and phase
 
-Source branch (`backend--dev`, `frontend--dev` or a `docs/<topic>` branch) and target branch (`main`).
+Source branch (`backend--dev`, `frontend--dev` or `docs/<topic>`), target branch (`main`) and phase.
 
 ## Scope
 
-List affected areas and distinguish approved decisions from proposals.
+List affected areas. Distinguish approved decisions from proposals.
 
 ## Validation
 
-Describe checks performed and results. For documentation-only changes, report link and consistency checks. Explain unavailable or deferred tests.
+Report local test results, frontend/backend integration results where applicable, and checks that could not run. For documentation-only changes, report link, JSON and consistency checks and `git diff --check`.
+
+## Unresolved issues
+
+List known problems and open decisions, or write "None".
 
 ## API, methodology and data impact
 
-Describe interface changes, processing assumptions, dataset provenance or attribution changes; write "None" when appropriate.
+Describe interface changes, processing assumptions, and dataset provenance or attribution changes, or write "None".
 
 ## Checklist
 
-- [ ] Changes follow PROJECT-CONTEXT.md and remain within the requested scope.
-- [ ] No application implementation is introduced before November 14, 2026.
-- [ ] `POST /analyze` fields remain `file`, `planet` and `reference_id`, or the change is agreed by both leads.
-- [ ] Responses match the approved mock files in `data/examples/`; `total_similarity` and per-metric `scores` stay within 0–1.
-- [ ] Similarity uses only the three MVP terrain metrics and is described as geometric terrain similarity, not habitability or base suitability.
-- [ ] No aridity, lithology or other deferred feature is added without separate human approval.
-- [ ] Documentation and relevant links are updated.
-- [ ] No secrets, uploaded DEMs or large generated datasets are included.
-- [ ] Files were staged by explicit path, not with `git add .` or `git add -A`.
-- [ ] Relevant validation is reported accurately.
-- [ ] Shared API, methodology or reference data changes have review from both lead roles.
-- [ ] Unresolved decisions and limitations are clearly identified.
+- [ ] Changes follow PROJECT-CONTEXT.md and stay within the requested scope and ownership area.
+- [ ] Responses match `docs/api-contract.md`. Fixtures in `data/examples/` keep `is_mock: true`, and mock values are not presented as results.
+- [ ] Similarity is described as geometric terrain similarity only, not habitability or base suitability.
+- [ ] No deferred feature (Moon, morphology, aridity, lithology) is added without separate human approval.
+- [ ] No `.venv`, `node_modules`, large DEMs, uploads, generated rasters or secrets are included.
+- [ ] Files were staged by explicit path.
+- [ ] Shared API, fixture or reference data changes have review from both leads.
+- [ ] After merge: integrated `main` will be tested, and `backend--dev` and `frontend--dev` synced.
 - [ ] A human will approve the merge; no automated agent merge.

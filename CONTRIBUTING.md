@@ -1,61 +1,56 @@
 # Contributing to Terra Analog
 
-## Authority and preparation boundary
+[PROJECT-CONTEXT.md](PROJECT-CONTEXT.md) defines approved scope, stack, data ownership and responsibilities. AI agents also follow [AGENTS.md](AGENTS.md). Proposals elsewhere are not final decisions.
 
-[PROJECT-CONTEXT.md](PROJECT-CONTEXT.md) defines approved scope, architecture and team responsibilities. AI agents must also follow [AGENTS.md](AGENTS.md). Technical proposals elsewhere are not final decisions.
+Keep changes focused, avoid unnecessary dependencies and abstractions, and explain important changes.
 
-Until November 14, 2026, work is limited to planning, documentation and repository preparation. Do not implement or scaffold the application, install project dependencies, or imply that proposed behavior already exists. The hackathon is planned for November 14–15, 2026.
-
-Keep changes focused, avoid unnecessary dependencies and abstractions, explain important changes, and never commit secrets or API keys.
-
-## Ownership
-
-| Area | Approved owner role |
-| --- | --- |
-| Backend, terrain processing, similarity algorithm and API | Backend Lead |
-| Validation, preparation, storage and integration of planetary reference data | Backend Lead |
-| Frontend and user interface | Frontend & Data Lead |
-| Research of NASA planetary reference data and provenance documentation | Frontend & Data Lead |
-
-Proposal: both leads review API, methodology and shared data assumptions. Assign actual people in GitHub; this document does not grant permissions.
-
-## Branch workflow (approved)
+## Branches
 
 | Branch | Purpose |
 | --- | --- |
-| `backend--dev` | Backend work |
-| `frontend--dev` | Frontend work |
-| `main` | Reviewed integration |
+| `backend--dev` | Backend work (Backend Lead + Claude) |
+| `frontend--dev` | Frontend work (Frontend & Data Lead + Codex) |
+| `docs/<topic>` | Short-lived documentation changes, created from the latest `origin/main` |
+| `main` | Reviewed integration. It must remain runnable once implementation begins. |
 
-- Pull requests target `main`.
-- Humans approve pull requests and merges. AI agents never merge automatically.
+## Phase workflow (mandatory)
+
+Every phase follows these steps in order:
+
+1. Develop on the assigned branch.
+2. Run local tests.
+3. Test frontend/backend integration where applicable.
+4. Create a pull request to `main`, reporting test results and unresolved issues.
+5. A human reviews and approves the changes.
+6. Merge into `main`. Only a human merges.
+7. Test the integrated `main` branch.
+8. Sync `backend--dev` and `frontend--dev` with `main` by merging `main` into each. Do not rebase or force-push.
+9. Start the next phase.
+
+The team defines each phase's scope. Phase 0 is the documentation and architecture revision. No application code is written in Phase 0.
+
+## Rules
+
+- Never merge automatically. AI agents never merge or approve pull requests.
+- Never force-push or rewrite shared history.
 - Do not work directly on `main`.
-- Documentation changes may use a short-lived `docs/<topic>` branch created from the latest `origin/main`.
-- Do not force-push shared history.
-- Stage files by explicit path; do not use `git add .` or `git add -A`.
-- Describe purpose, affected areas and validation in each PR. Request the other lead's review for shared interfaces such as the API contract and reference data. Keep unrelated changes separate.
-
-Open: `backend--dev` and `frontend--dev` were created before the project documentation reached `main`. A human should bring them up to date with `main` (for example, by merging `main` into them) before development starts.
+- Stage files by explicit path. Do not use `git add .` or `git add -A`.
+- Never commit `.venv`, `node_modules`, large DEMs, uploads, generated rasters, secrets or API keys.
+- Request the other lead's review for shared interfaces: the API contract, `data/examples/` and reference data.
+- Keep unrelated changes in separate pull requests.
 
 ## Validation
 
-For documentation, check relative links, terminology, consistency with project context, and the final diff for accidental code, secrets or datasets. For application changes beginning November 14, run relevant tests and report results before committing. Document unavailable tests honestly; do not claim planned checks have passed.
+- **Documentation:** check relative links, JSON examples, terminology, consistency with PROJECT-CONTEXT.md, and the diff for accidental code, secrets or datasets. Run `git diff --check`.
+- **Application changes:** run relevant tests and report the results in the PR. Document tests that could not run; do not claim planned checks have passed.
 
-## Proposed GitHub collaboration setup
+## Recommended GitHub setup
 
-An authorized repository administrator should verify collaborator access, assign owners, and configure PR-based protection for `main` with one reviewer where supported. Restrict force pushes and branch deletion. Do not require CI checks before those checks exist.
+These settings are recommendations and are not verified as configured. An authorized administrator should:
 
-Use issues with an owner and acceptance criteria, labels for documentation/backend/frontend/data/blockers, a November 14–15 milestone, and a Todo / In progress / Review / Done board. These settings are recommendations and have not been verified or configured by this documentation change.
+- Verify collaborator access.
+- Protect `main` with pull requests and one reviewer.
+- Restrict force pushes and branch deletion.
+- Avoid requiring CI checks until those checks exist.
 
-## Readiness checklist
-
-- [ ] Team has reviewed the preparation documents and their open questions.
-- [ ] `backend--dev` and `frontend--dev` are up to date with `main`.
-- [ ] Collaborator permissions are verified.
-- [ ] Branch protection for `main` is configured.
-- [ ] Both leads agree on the remaining API details (limits, response and error schema).
-- [ ] Metric definitions, units, normalization and score interpretation are agreed for the three MVP metrics.
-- [ ] Planetary reference data has documented provenance, usage terms and resolution.
-- [ ] Tasks have owners and acceptance criteria for November 14–15.
-- [ ] Documentation links and ignore rules are checked.
-- [ ] No application implementation was introduced before November 14.
+Issues with owners and acceptance criteria, labels (documentation/backend/frontend/data/blockers) and a simple board are suggested.

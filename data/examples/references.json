@@ -1,0 +1,12 @@
+{
+  "is_mock": true,
+  "references": [
+    {
+      "id": "mars-gale",
+      "name": "Gale Crater",
+      "dataset": "NASA MGS MOLA",
+      "effective_resolution_m": null,
+      "preview_url": "/static/references/mars-gale/preview.png"
+    }
+  ]
+}
