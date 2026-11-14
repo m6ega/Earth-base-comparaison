@@ -250,10 +250,33 @@
         const grid = document.querySelector('.terrain-grid');
         if (!grid) return;
 
-        const offset = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
-        if (Math.abs(grid.getBoundingClientRect().top - offset) < 4) return;
+        if (Math.abs(grid.getBoundingClientRect().top - scrollOffset()) < 4) return;
 
+        autoScrollUntil = performance.now() + 1500;
         scrollToEl(grid);
+    }
+
+    // Header clearance used by scrollIntoView (html scroll-padding-top).
+    const scrollOffset = () =>
+        parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+
+    // Time until which an automatic smooth scroll to the cards may still be running.
+    let autoScrollUntil = 0;
+
+    // After an automatic scroll ends, settle on the cards if content above them
+    // changed meanwhile. Skipped if the user has scrolled away in the meantime.
+    function realignAfterAutoScroll(grid) {
+        let done = false;
+        const settle = () => {
+            if (done) return;
+            done = true;
+            const top = grid.getBoundingClientRect().top;
+            if (Math.abs(top - scrollOffset()) >= 4 && Math.abs(top - scrollOffset()) < 120) {
+                scrollToEl(grid);
+            }
+        };
+        if ('onscrollend' in window) window.addEventListener('scrollend', settle, { once: true });
+        setTimeout(settle, Math.max(0, autoScrollUntil - performance.now()) + 100);
     }
 
     class AnalysisError extends Error {
@@ -1109,6 +1132,11 @@
     }
 
     function render(data, file) {
+        // Text above the cards (e.g. the scale explanation) can change height
+        // when results arrive; remember where the cards are to keep them still.
+        const grid = document.querySelector('.terrain-grid');
+        const gridTopBefore = grid ? grid.getBoundingClientRect().top : null;
+
         const ref = data.reference;
         const label = planetLabel(String(ref.body || state.activePlanet).toLowerCase());
         const earthURL = previewURL(data.earth_preview_url);
@@ -1254,8 +1282,22 @@
         });
 
         countUp(ui.score, total * 100);
-        // No scroll here: the view moved to the comparison cards when the
-        // analysis started, and must not jump again when the response arrives.
+        // No new scroll target: the view moved to the comparison cards when the
+        // analysis started. Only cancel any shift caused by content above them.
+        if (grid && gridTopBefore !== null) {
+            const shift = grid.getBoundingClientRect().top - gridTopBefore;
+
+            if (Math.abs(shift) > 1) {
+                if (Math.abs(gridTopBefore - scrollOffset()) >= 4 && performance.now() < autoScrollUntil) {
+                    // The automatic smooth scroll is still running towards the old
+                    // position: let it finish, then settle on the cards.
+                    realignAfterAutoScroll(grid);
+                } else {
+                    // Cards aligned, or the user is elsewhere: keep the view still.
+                    window.scrollBy({ top: shift, behavior: 'instant' });
+                }
+            }
+        }
 
         announce(
             `Analysis complete. Terrain similarity ${index100(total)} out of 100.`
