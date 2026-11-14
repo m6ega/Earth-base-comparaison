@@ -20,8 +20,12 @@ No endpoint is implemented yet. Scope and decisions: [PROJECT-CONTEXT.md](../PRO
 | --- | --- | --- |
 | `file` | File | One Earth elevation GeoTIFF |
 | `reference_id` | String | `id` of a reference returned by `GET /references` |
+| `vertical_unit` | String, optional (additive) | Explicit elevation unit (`metre`, `foot`, ...), used only when the GeoTIFF declares no units |
+| `vertical_unit_fallback` | String, optional (additive) | Default unit used only when the GeoTIFF declares no units and no `vertical_unit` is sent; reported as warning `VERTICAL_UNITS_ASSUMED`. The website sends `metre`. |
 
-The previous `planet` field is removed. The MVP is Mars only.
+Declared units in the file always take precedence over both optional fields.
+The previous `planet` field is removed. References now cover Mars and the Moon
+(see `body` in `GET /references` and [backend/PLANETARY-REFERENCES.md](../backend/PLANETARY-REFERENCES.md)).
 
 ## Common schema
 
@@ -168,6 +172,7 @@ Reject a `reference_id` that is not in the prepared reference list. Never accept
 | `415` | Unsupported file format |
 | `422` | Missing fields or unusable elevation data, for example `INVALID_DEM` |
 | `500` | Unexpected processing failure |
+| `503` | `SERVER_BUSY`: all analysis slots stayed busy for the configured wait (additive) |
 
 Decide whether FastAPI validation errors are normalized into the error shape. Never expose internal paths or stack traces.
 
