@@ -81,6 +81,25 @@ SCORE_WEIGHTS = {  # proposal: equal weights, no scientific claim
 PREVIEW_MAX_PIXELS_PER_SIDE = 512
 
 
+# --- Deployment (environment variables) -----------------------------------------
+def _env_int(name: str, default: int, minimum: int = 1) -> int:
+    try:
+        return max(minimum, int(os.environ.get(name, default)))
+    except ValueError:
+        return default
+
+
+# Terrain analyses are CPU- and memory-heavy (up to MAX_READ_WINDOW_PIXELS
+# float64 cells per DEM). Bound how many run at once per process; further
+# requests wait up to ANALYSIS_QUEUE_TIMEOUT_S and then receive 503 SERVER_BUSY.
+MAX_CONCURRENT_ANALYSES = _env_int("TERRA_MAX_CONCURRENT_ANALYSES", 2)
+ANALYSIS_QUEUE_TIMEOUT_S = _env_int("TERRA_ANALYSIS_QUEUE_TIMEOUT_S", 60, minimum=0)
+
+# The static frontend served by the API (same origin, no CORS needed).
+FRONTEND_DIR = Path(os.environ.get("TERRA_FRONTEND_DIR") or BACKEND_DIR.parent / "frontend").resolve()
+SERVE_FRONTEND = os.environ.get("TERRA_SERVE_FRONTEND", "1").strip().lower() not in {"0", "false", "no"}
+
+
 def cors_origins() -> list[str]:
     """Local React/Vite and static-server origins; override with TERRA_CORS_ORIGINS."""
     raw = os.environ.get("TERRA_CORS_ORIGINS")

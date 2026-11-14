@@ -22,7 +22,7 @@ import terrain_features as tf
 from preprocessing import HarmonizedGrid, harmonize, near_native, plan_common_grid, preview_grid
 from preview import png_data_url
 from reference import PlanetaryReference, load_reference
-from validation import open_earth_dem
+from validation import ASSUMED_UNIT_SOURCE, open_earth_dem
 
 METRICS = ("relative_relief", "slope_distribution", "surface_roughness")
 
@@ -137,11 +137,13 @@ def analyze(
     earth_path: Path,
     reference_id: str,
     vertical_unit: str | None = None,
+    vertical_unit_fallback: str | None = None,
 ) -> dict:
     """Analyze an Earth DEM against a registered planetary reference.
 
     vertical_unit is optional. It is used only when the uploaded DEM
-    does not provide usable elevation-unit metadata.
+    does not provide usable elevation-unit metadata. vertical_unit_fallback
+    is applied only when neither metadata nor vertical_unit is available.
     """
 
     ref: PlanetaryReference = load_reference(reference_id)
@@ -150,6 +152,7 @@ def analyze(
     earth, facts = open_earth_dem(
         earth_path,
         vertical_unit=vertical_unit,
+        vertical_unit_fallback=vertical_unit_fallback,
     )
 
     resolution, cells = plan_common_grid(earth, ref.source)
@@ -285,6 +288,16 @@ def analyze(
                 "PARTIAL_COVERAGE",
                 f"{1 - valid_fraction:.1%} of the Earth comparison window has no valid "
                 "elevation data and was excluded.",
+            )
+        )
+
+    if facts["vertical_unit_source"] == ASSUMED_UNIT_SOURCE:
+        warnings.append(
+            _warning(
+                "VERTICAL_UNITS_ASSUMED",
+                "The GeoTIFF declares no elevation units, so its values were interpreted "
+                f"using the requested default ({facts['vertical_to_metres']:g} m per unit). "
+                "If the file actually stores other units, these results are not valid.",
             )
         )
 

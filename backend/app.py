@@ -9,21 +9,26 @@ from __future__ import annotations
 
 import logging
 import tempfile
+import threading
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import analysis
 import errors
 import settings
 from reference import REFERENCE_DIRS, list_references, load_reference
-from validation import check_extension, save_upload
+from validation import check_extension, save_upload, unit_name_to_metres
 
 logger = logging.getLogger("terra")
+
+# Bounds concurrent terrain analyses in this process (see settings).
+_analysis_slots = threading.BoundedSemaphore(settings.MAX_CONCURRENT_ANALYSES)
 
 
 def error_response(code: str, message: str, status: int) -> JSONResponse:
@@ -261,6 +266,7 @@ def analyze(
     file: UploadFile | None = File(None),
     reference_id: str | None = Form(None),
     vertical_unit: str | None = Form(None),
+    vertical_unit_fallback: str | None = Form(None),
 ):
     if file is None or not file.filename:
         raise errors.fail(
@@ -286,16 +292,41 @@ def analyze(
     # Empty form values are treated as no selection.
     if vertical_unit is not None:
         vertical_unit = vertical_unit.strip().lower() or None
-
-    with tempfile.TemporaryDirectory(prefix="terra-") as tmp:
-        # Fixed name: the client filename is never used as a path.
-        path = Path(tmp) / "upload.tif"
-
-        save_upload(file.file, path)
-
-        # analysis.py will pass this optional selection to validation.py.
-        return analysis.analyze(
-            path,
-            reference_id,
-            vertical_unit,
+    if vertical_unit_fallback is not None:
+        vertical_unit_fallback = vertical_unit_fallback.strip().lower() or None
+    if vertical_unit_fallback is not None and unit_name_to_metres(vertical_unit_fallback) is None:
+        raise errors.fail(
+            errors.UNKNOWN_VERTICAL_UNITS,
+            "The 'vertical_unit_fallback' value is not a supported unit. Use metre or foot.",
         )
+
+    if not _analysis_slots.acquire(timeout=settings.ANALYSIS_QUEUE_TIMEOUT_S):
+        raise errors.fail(
+            errors.SERVER_BUSY,
+            "The analysis engine is busy with other requests. Please try again shortly.",
+        )
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="terra-") as tmp:
+            # Fixed name: the client filename is never used as a path.
+            path = Path(tmp) / "upload.tif"
+
+            save_upload(file.file, path)
+
+            # analysis.py will pass this optional selection to validation.py.
+            return analysis.analyze(
+                path,
+                reference_id,
+                vertical_unit,
+                vertical_unit_fallback,
+            )
+    finally:
+        _analysis_slots.release()
+
+
+# Same-origin frontend: mounted last so every API route above takes precedence.
+# StaticFiles rejects path traversal; only files inside FRONTEND_DIR are served.
+if settings.SERVE_FRONTEND and (settings.FRONTEND_DIR / "index.html").is_file():
+    app.mount("/", StaticFiles(directory=settings.FRONTEND_DIR, html=True), name="frontend")
+elif settings.SERVE_FRONTEND:
+    logger.warning("Frontend directory not found; serving the API only.")

@@ -147,10 +147,14 @@ def _check_horizontal(crs: pyproj.CRS) -> None:
                 )
 
 
+ASSUMED_UNIT_SOURCE = "assumed default (no units declared)"
+
+
 def _vertical_factor(
     vertical_crs: pyproj.CRS | None,
     band_unit: str | None,
     user_unit: str | None = None,
+    fallback_unit: str | None = None,
 ) -> tuple[float, str]:
     """Determine the vertical-to-metre conversion factor.
 
@@ -235,6 +239,20 @@ def _vertical_factor(
 
         return selected_factor, "user selection"
 
+    # Client-supplied default for files that declare no units at all. It is
+    # never consulted when metadata or an explicit selection exists, so a
+    # file declaring feet can never be read as metres through this path.
+    if fallback_unit is not None:
+        fallback_factor = unit_name_to_metres(fallback_unit)
+
+        if fallback_factor is None:
+            raise errors.fail(
+                errors.UNKNOWN_VERTICAL_UNITS,
+                "The default elevation unit is not supported. Use metres or feet.",
+            )
+
+        return fallback_factor, ASSUMED_UNIT_SOURCE
+
     raise errors.fail(
         errors.UNKNOWN_VERTICAL_UNITS,
         "The GeoTIFF does not declare its elevation units. "
@@ -246,11 +264,14 @@ def _vertical_factor(
 def open_earth_dem(
     path: Path,
     vertical_unit: str | None = None,
+    vertical_unit_fallback: str | None = None,
 ) -> tuple[DemSource, dict]:
     """Validate an uploaded GeoTIFF and return its measured geometry.
 
     vertical_unit is an optional explicit user selection. It is used only
     when the GeoTIFF does not provide usable vertical-unit metadata.
+    vertical_unit_fallback is an optional default applied only when there is
+    neither usable metadata nor an explicit selection; it is reported.
 
     Returns the DemSource and a dict of facts used for warnings.
     """
@@ -327,6 +348,7 @@ def open_earth_dem(
                 vertical,
                 band_unit,
                 vertical_unit,
+                vertical_unit_fallback,
             )
 
             scale, offset = float(ds.scales[0]), float(ds.offsets[0])
