@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terra Analog | Terrain Analyzer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <aside class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">TA</div>
+            <div>
+                <h2>TERRA ANALOG</h2>
+                <p>PLANETARY TERRAIN ANALYSIS</p>
+            </div>
+        </div>
+
+        <nav>
+            <p class="nav-label">WORKSPACE</p>
+            <button class="nav-button active" id="homeBtn">Home</button>
+            <button class="nav-button" id="newAnalysisBtn">+ New Analysis</button>
+            <button class="nav-button" id="changeReferenceBtn">Change Reference</button>
+
+            <p class="nav-label">INFORMATION</p>
+            <button class="nav-button" id="aboutBtn">About Terra Analog</button>
+        </nav>
+
+        <div class="sidebar-footer">
+            <span class="status-dot"></span>
+            SYSTEM READY
+            <p>Terra Analog v1.0</p>
+        </div>
+    </aside>
+
+
+    <main class="main-content">
+
+        <header class="topbar">
+            <div>
+                <p class="breadcrumb">WORKSPACE / ANALYSIS</p>
+                <h1>Terrain Analysis Dashboard</h1>
+            </div>
+
+            <div class="topbar-right">
+                <span class="status-label">MARS REFERENCE</span>
+                <span class="user-label">TA</span>
+            </div>
+        </header>
+
+
+        <section class="welcome-section">
+            <div>
+                <h2>Compare worlds. Discover similarities.</h2>
+                <p>
+                    Analyze Earth's terrain against planetary elevation
+                    datasets to identify potential analog environments.
+                </p>
+            </div>
+
+            <button class="primary-button" id="uploadBtn">
+                Upload Earth DEM
+            </button>
+
+            <input type="file" id="demInput" accept=".tif,.tiff" hidden>
+        </section>
+
+
+        <section class="comparison-section">
+
+            <div class="section-heading">
+                <div>
+                    <p class="section-number">01 / TERRAIN COMPARISON</p>
+                    <h2>Planetary Surface Overview</h2>
+                </div>
+
+                <button class="secondary-button" id="swapBtn">
+                    ⇄ Swap DEMs
+                </button>
+            </div>
+
+
+            <div class="map-grid">
+
+                <article class="panel map-panel" id="marsPanel">
+
+                    <div class="panel-header">
+                        <div>
+                            <span class="planet-tag mars-tag">MARS REFERENCE</span>
+                            <h3>Gale Crater</h3>
+                        </div>
+                        <span class="coordinates">5.4°S / 137.8°E</span>
+                    </div>
+
+                    <div class="map-placeholder">
+                        <img
+                            src="../mars-source/mars-gale-preview.png"
+                            alt="Mars Gale Crater elevation preview"
+                            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                        >
+                        <div class="map-fallback">
+                            MARS TERRAIN DATA
+                            <span>Reference DEM</span>
+                        </div>
+                    </div>
+
+                    <div class="map-controls">
+                        <span class="layer-label">LAYER</span>
+                        <select class="layer-select">
+                            <option value="elevation">Elevation</option>
+                            <option value="hillshade">Hillshade</option>
+                            <option value="slope">Slope</option>
+                            <option value="roughness">Roughness</option>
+                        </select>
+
+                        <div class="zoom-controls">
+                            <button class="zoom-btn" data-zoom="in">+</button>
+                            <button class="zoom-btn" data-zoom="out">−</button>
+                            <button class="zoom-btn" data-zoom="reset">Reset</button>
+                        </div>
+                    </div>
+
+                </article>
+
+
+                <article class="panel map-panel" id="earthPanel">
+
+                    <div class="panel-header">
+                        <div>
+                            <span class="planet-tag earth-tag">EARTH UPLOAD</span>
+                            <h3 id="earthTitle">Awaiting Earth DEM</h3>
+                        </div>
+                        <span class="coordinates" id="earthCoordinates">NO DATA</span>
+                    </div>
+
+                    <div class="map-placeholder earth-placeholder">
+                        <div class="upload-message" id="uploadMessage">
+                            <span class="upload-icon">+</span>
+                            <h3>Upload a DEM file</h3>
+                            <p>Import a GeoTIFF elevation dataset</p>
+                            <button class="secondary-button" id="selectFileBtn">
+                                Select File
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="map-controls">
+                        <span class="layer-label">LAYER</span>
+                        <select class="layer-select">
+                            <option value="elevation">Elevation</option>
+                            <option value="hillshade">Hillshade</option>
+                            <option value="slope">Slope</option>
+                            <option value="roughness">Roughness</option>
+                        </select>
+
+                        <div class="zoom-controls">
+                            <button class="zoom-btn" data-zoom="in">+</button>
+                            <button class="zoom-btn" data-zoom="out">−</button>
+                            <button class="zoom-btn" data-zoom="reset">Reset</button>
+                        </div>
+                    </div>
+
+                </article>
+
+            </div>
+        </section>
+
+
+        <section class="results-section">
+
+            <div class="section-heading">
+                <div>
+                    <p class="section-number">02 / ANALYSIS RESULTS</p>
+                    <h2>Terrain Similarity</h2>
+                </div>
+
+                <button class="secondary-button" id="exportBtn">
+                    Export Report
+                </button>
+            </div>
+
+
+            <div class="results-grid">
+
+                <article class="panel score-panel">
+                    <p class="panel-label">OVERALL SIMILARITY</p>
+
+                    <div class="score-circle">
+                        <div>
+                            <strong id="similarityScore">--</strong>
+                            <span>%</span>
+                        </div>
+                    </div>
+
+                    <p class="score-description" id="scoreDescription">
+                        Upload an Earth DEM to begin analysis.
+                    </p>
+                </article>
+
+
+                <article class="panel breakdown-panel">
+                    <p class="panel-label">SIMILARITY BREAKDOWN</p>
+
+                    <div class="metric">
+                        <div class="metric-heading">
+                            <span>Elevation</span>
+                            <span id="elevationValue">--</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="elevationBar"></div>
+                        </div>
+                    </div>
+
+                    <div class="metric">
+                        <div class="metric-heading">
+                            <span>Surface Roughness</span>
+                            <span id="roughnessValue">--</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="roughnessBar"></div>
+                        </div>
+                    </div>
+
+                    <div class="metric">
+                        <div class="metric-heading">
+                            <span>Slope</span>
+                            <span id="slopeValue">--</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="slopeBar"></div>
+                        </div>
+                    </div>
+
+                    <div class="metric">
+                        <div class="metric-heading">
+                            <span>Environmental Similarity</span>
+                            <span id="environmentValue">--</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="environmentBar"></div>
+                        </div>
+                    </div>
+
+                </article>
+
+            </div>
+        </section>
+
+
+        <section class="profiles-section">
+
+            <div class="section-heading">
+                <div>
+                    <p class="section-number">03 / ELEVATION ANALYSIS</p>
+                    <h2>Terrain Profiles</h2>
+                </div>
+            </div>
+
+            <div class="profile-grid">
+
+                <article class="panel profile-panel">
+                    <span class="planet-tag mars-tag">MARS</span>
+                    <h3>Gale Crater Elevation Profile</h3>
+                    <div class="chart-placeholder">
+                        <p>Elevation profile will appear here</p>
+                    </div>
+                </article>
+
+                <article class="panel profile-panel">
+                    <span class="planet-tag earth-tag">EARTH</span>
+                    <h3>Earth Region Elevation Profile</h3>
+                    <div class="chart-placeholder">
+                        <p>Upload a DEM to generate a profile</p>
+                    </div>
+                </article>
+
+            </div>
+        </section>
+
+
+        <footer>
+            <span>TERRA ANALOG</span>
+            <span>EARTH TERRAIN / PLANETARY COMPARISON</span>
+        </footer>
+
+    </main>
+
+    <script src="script.js"></script>
+
+</body>
+</html>
