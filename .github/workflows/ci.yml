@@ -46,7 +46,7 @@ jobs:
           for i in $(seq 60); do curl -fs http://127.0.0.1:8000/health && break; sleep 1; done
       - name: Create synthetic Earth DEM (test fixture, not observational data)
         run: |
-          pip install --only-binary=:all: -r backend/requirements.txt
+          pip install --only-binary=:all: -r backend/requirements-dev.txt   # conftest imports pytest
           cd backend && python -c "import sys; sys.path.insert(0,'tests'); from conftest import *; from pathlib import Path; x,y=utm_grid(1200,50.0); write_dem(Path('/tmp/earth.tif'), synthetic_surface(x,y))"
       - name: Smoke test all references through HTTP
         run: |
