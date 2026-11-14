@@ -58,7 +58,7 @@ def test_mars_compared_with_itself_scores_one():
     cells = int(2 * ref.source.half_extent_m // res)
     feats = compute_features(harmonize(ref.source, res, cells), "Mars")
     cached = mars_features("mars-gale", res, cells, settings.METHODOLOGY_VERSION)
-    scores = {m: similarity.distribution_similarity(feats.histograms[m], cached.histograms[m]) for m in feats.histograms}
+    scores = {m: similarity.distribution_similarity(feats.scoring_histograms[m], cached.scoring_histograms[m]) for m in feats.histograms}
     assert all(s == pytest.approx(1.0) for s in scores.values())
 
 
@@ -113,4 +113,4 @@ def test_different_input_resolutions_give_consistent_features(tmp_path):
     diff = np.nanmean(np.abs(grids[30.0].elevation_m - grids[90.0].elevation_m))
     assert diff < 5.0  # metres, against ~1 km of relief
     for m in feats[30.0].histograms:
-        assert similarity.distribution_similarity(feats[30.0].histograms[m], feats[90.0].histograms[m]) > 0.9
+        assert similarity.distribution_similarity(feats[30.0].scoring_histograms[m], feats[90.0].scoring_histograms[m]) > 0.9

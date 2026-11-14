@@ -91,7 +91,15 @@ Remove-Item synthetic_earth.tif
 
 CORS allows the local Vite (`5173`, `4173`) and Live Server (`5500`) origins on `localhost` and `127.0.0.1`, without credentials. To override, set a comma-separated list before starting the server, for example `$env:TERRA_CORS_ORIGINS = "http://localhost:3000"`. Wildcards are ignored.
 
-## Scientific method (proposal, methodology version `0.2-proposal`)
+## Scientific method (proposal, methodology version `0.3-proposal`)
+
+See [SCIENTIFIC-FIXES-0.3.md](SCIENTIFIC-FIXES-0.3.md) for the equations,
+controlled evaluation, limitations and integration procedure for this revision.
+Earth band values are decoded as `(raw * scale + offset) * unit_to_metres`
+after applying the source valid-data mask. Scoring uses continuous linear
+assignment between existing bin centers; charts retain hard interval counts.
+Bins, Jensen-Shannon distance and equal weights are unchanged. Earlier scores
+must not be compared directly with version 0.3 scores.
 
 ### Validation (hard failures)
 
@@ -141,15 +149,16 @@ Values above the last edge count in the last bin.
 ### Similarity
 
 - **Per metric:** `score = 1 − JSD₂(p_earth, p_mars)`, where `JSD₂` is the base-2 Jensen–Shannon *distance* (the square root of the divergence). It lies in [0, 1], so the score does too.
+- **Scoring distributions:** linear mass assignment between the midpoints of the listed bins, clamped at the first/last midpoint. Ordinary histogram fractions are retained for the slope chart. No pseudocount or fitted bandwidth is used.
 - **Total:** `total_similarity = (relative_relief + slope_distribution + surface_roughness) / 3`. These are equal weights, which is a proposal with no scientific claim.
 - **Score scale:** the contract specifies 0–1, and the frontend displays percentages. `100 × (1 − distance)` is the same number shown as a percentage.
 - **Numerical checks:** distributions must be finite, non-negative and have mass. Scores must be finite and within [0, 1]. Responses are serialized with `allow_nan=False`. Any failure returns `PROCESSING_FAILED`, never a default score.
 - **Mars feature cache:** in memory (LRU), keyed by reference ID, resolution, cell count and `METHODOLOGY_VERSION`.
-- **What the score is not:** it is not a probability, a confidence or a statistical test. It is a bounded distance between two histograms: 1 means identical histograms, and 0 means no shared bins. It is not calibrated against any terrain-analog judgement and says nothing about site suitability.
+- **What the score is not:** it is not a probability, a confidence or a statistical test. It is a bounded distance between two soft descriptor distributions: 1 means identical histograms, and 0 means no shared bins. It is not calibrated against any terrain-analog judgement and says nothing about site suitability.
   - Neighbourhoods overlap, so histogram counts are not independent samples.
   - Finite grids from the same terrain process score below 1.
-  - Values exactly on a bin edge can be split between two bins by rounding.
-  - Flat terrain on both sides scores 1.0 on every metric, a degenerate result that is flagged only for Earth (`FLAT_TERRAIN`).
+  - Chart counts remain sensitive at bin edges; scoring mass varies continuously between bin centers.
+  - Flat terrain on both sides scores 1.0 on every metric; both sides now receive flat/low-information warnings. This is not proof of an analog.
 
 ### Warnings (proposed codes)
 
@@ -164,7 +173,12 @@ Values above the last edge count in the last bin.
 | `FOOTPRINT_LIMITED_BY_EARTH` | The Earth DEM is smaller than the Mars reference |
 | `PARTIAL_COVERAGE` | 50–95% of the Earth window is valid |
 | `VERTICAL_UNITS_CONVERTED` | Elevations were converted from feet |
-| `FLAT_TERRAIN` | The local relief everywhere is below 1 m |
+| `FLAT_TERRAIN` / `REFERENCE_FLAT_TERRAIN` | Local relief everywhere is below 1 m on the named side |
+| `LOW_INFORMATION_TERRAIN` | A named metric has an exact single-bin chart distribution on either side |
+| `DESCRIPTOR_SIMILARITY_ONLY` | Always: descriptor agreement does not establish morphology/geology |
+| `CROSS_REFERENCE_SCALE_CAUTION` | Always: adaptive-scale scores cannot be directly ranked across references |
+| `SOFT_HISTOGRAM_SCORING` | Always: scores use soft mass; chart retains ordinary counts |
+| `ELEVATION_ENCODING_APPLIED` | Nonidentity Earth band scale/offset was decoded |
 
 ### Errors (proposed codes)
 
@@ -188,11 +202,11 @@ Every error uses the contract's error shape and never exposes paths or stack tra
   - Zero is treated as NoData, per the source header, even though 0 m is a possible Mars elevation.
     - **Unresolved; the data are unchanged.** All 7 masked pixels sit on the 0 m contour: their neighbours are small values of both signs. They look like genuine elevations rather than gaps.
     - The source label `megt00n090hb.xml` is not in the repository, so the convention cannot be confirmed or rejected here.
-    - Impact against the synthetic Earth: treating them as valid changes the total from 0.3584 to 0.3594.
+    - Historical methodology-0.2 impact against the synthetic Earth: treating them as valid changed the total from 0.3584 to 0.3594; not a current 0.3 calibration.
     - `tests/test_scale_harmonization.py` records this finding.
-- **Support mismatch:** an Earth cell is a box average of finer data. A Mars cell is one MOLA grid value with its own, undocumented footprint. Even identical landscapes do not score 1.0: 0.88 total in the synthetic 30 km test, where Mars values are point samples.
+- **Support mismatch:** an Earth cell is a box average of finer data. A Mars cell is one MOLA grid value with its own, undocumented footprint. Even identical landscapes need not score 1.0. The historical methodology-0.2 synthetic 30 km test scored about 0.88 with point-sampled Mars values; do not treat that value as a 0.3 baseline.
 - **Windowing:** the central window is deterministic. A NoData-heavy centre can cause rejection even if valid terrain exists elsewhere.
-- **Earth datum:** the local Earth projection uses the upload's own geodetic CRS. Vertical datums do not matter because no absolute elevations are compared.
+- **Earth datum:** the local Earth projection uses the upload's own geodetic CRS. Constant vertical offsets cancel; spatially varying vertical datum differences can still affect gradients and relief.
 - **Caching:** the cache is per process and not persisted.
 
 ### Before using real Earth satellite DEMs

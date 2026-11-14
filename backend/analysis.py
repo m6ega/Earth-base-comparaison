@@ -30,6 +30,7 @@ METRICS = ("relative_relief", "slope_distribution", "surface_roughness")
 @dataclass(frozen=True)
 class FeatureSet:
     histograms: dict[str, tuple[float, ...]]
+    scoring_histograms: dict[str, tuple[float, ...]]
     samples: dict[str, int]
     max_relief_m: float
     sampling: str = "average"
@@ -53,7 +54,7 @@ def compute_features(grid: HarmonizedGrid, label: str) -> FeatureSet:
         ),
     }
 
-    histograms, samples = {}, {}
+    histograms, scoring_histograms, samples = {}, {}, {}
 
     for name, (values, edges) in arrays.items():
         fractions, count = tf.histogram_fractions(values, edges)
@@ -67,12 +68,15 @@ def compute_features(grid: HarmonizedGrid, label: str) -> FeatureSet:
             )
 
         histograms[name] = tuple(float(v) for v in fractions)
+        soft, _ = tf.soft_histogram_fractions(values, edges)
+        scoring_histograms[name] = tuple(float(v) for v in soft)
         samples[name] = count
 
     relief = arrays["relative_relief"][0]
 
     return FeatureSet(
         histograms=histograms,
+        scoring_histograms=scoring_histograms,
         samples=samples,
         max_relief_m=float(np.nanmax(relief)),
         sampling=grid.sampling,
@@ -111,6 +115,22 @@ def reference_features(
 
 def _warning(code: str, message: str) -> dict:
     return {"code": code, "message": message}
+
+
+def information_warnings(earth: FeatureSet, reference: FeatureSet) -> list[dict]:
+    result = []
+    for label, features in (("Earth", earth), ("reference", reference)):
+        if features.max_relief_m < settings.FLAT_RELIEF_THRESHOLD_M:
+            result.append(_warning("FLAT_TERRAIN" if label == "Earth" else "REFERENCE_FLAT_TERRAIN",
+                                   f"The {label} window is essentially flat at the comparison scale. "
+                                   "A high score between low-information distributions is not evidence of a terrain analog."))
+        # No arbitrary entropy cutoff: report only exact single-bin degeneracy.
+        degenerate = [name for name, h in features.histograms.items() if np.count_nonzero(h) == 1]
+        if degenerate:
+            result.append(_warning("LOW_INFORMATION_TERRAIN",
+                                   f"The {label} window has single-bin chart distributions for "
+                                   + ", ".join(degenerate) + ". Their discrimination is limited by the bin resolution."))
+    return result
 
 
 def analyze(
@@ -159,8 +179,8 @@ def analyze(
     try:
         scores = {
             metric: similarity.distribution_similarity(
-                earth_feat.histograms[metric],
-                mars_feat.histograms[metric],
+                earth_feat.scoring_histograms[metric],
+                mars_feat.scoring_histograms[metric],
             )
             for metric in METRICS
         }
@@ -189,6 +209,22 @@ def analyze(
             f"({cells} x {cells} cells).",
         ),
     ]
+
+    warnings.extend([
+        _warning("DESCRIPTOR_SIMILARITY_ONLY",
+                 "Scores compare local descriptor distributions, not geological or morphological equivalence. "
+                 "Hills and depressions can have identical descriptors; a score of 1 is not proof of an analog."),
+        _warning("CROSS_REFERENCE_SCALE_CAUTION",
+                 "Resolution and central footprint depend on both inputs. Scores at different physical scales "
+                 "must not be directly ranked across references. Even matching scales require calibration."),
+        _warning("SOFT_HISTOGRAM_SCORING",
+                 "Methodology 0.3 uses linear assignment between existing bin centers for scoring; "
+                 "the slope chart retains ordinary interval counts. Earlier methodology scores are not directly comparable."),
+    ])
+    if facts["elevation_scale"] != 1.0 or facts["elevation_offset"] != 0.0:
+        warnings.append(_warning("ELEVATION_ENCODING_APPLIED",
+                                 "Earth elevations were decoded as (raw sample * band scale + band offset) "
+                                 "before conversion to metres; raw NoData and masks were preserved."))
 
     if ref.api_object()["effective_resolution_m"] is None:
         warnings.append(
@@ -263,14 +299,7 @@ def analyze(
             )
         )
 
-    if earth_feat.max_relief_m < settings.FLAT_RELIEF_THRESHOLD_M:
-        warnings.append(
-            _warning(
-                "FLAT_TERRAIN",
-                "The Earth window is essentially flat at the comparison resolution, "
-                "so its terrain distributions are degenerate.",
-            )
-        )
+    warnings.extend(information_warnings(earth_feat, mars_feat))
 
     warnings.extend(_warning("REFERENCE_LIMITATION", note) for note in ref.api_object()["limitations"])
     # Check again even on a cached feature hit: never attach stale metadata/results.

@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
-from scipy.spatial.distance import jensenshannon
+from scipy.special import rel_entr
 
 import settings
 
@@ -36,7 +36,17 @@ def js_distance(p, q, base: float = settings.JS_LOG_BASE) -> float:
     pn, qn = _as_distribution(p), _as_distribution(q)
     if pn.shape != qn.shape:
         raise SimilarityError("distributions must use identical bins")
-    d = float(jensenshannon(pn, qn, base=base))
+    if not (math.isfinite(base) and base > 1):
+        raise SimilarityError("logarithm base must be finite and greater than one")
+    midpoint = (pn + qn) / 2.0
+    # Same Jensen-Shannon formula as SciPy's distance. Sum before sqrt so
+    # floating-point cancellation can be checked: near-identical distributions
+    # can otherwise produce a tiny negative divergence and a NaN distance.
+    divergence = math.fsum(rel_entr(pn, midpoint)) + math.fsum(rel_entr(qn, midpoint))
+    roundoff = 64 * np.finfo(np.float64).eps
+    if not math.isfinite(divergence) or divergence < -roundoff:
+        raise SimilarityError("Jensen-Shannon divergence failed a numerical check")
+    d = math.sqrt(max(divergence, 0.0) / (2.0 * math.log(base)))
     if not math.isfinite(d):
         raise SimilarityError("Jensen-Shannon distance is not finite")
     upper = 1.0 if base == 2.0 else math.sqrt(math.log(2.0, base))

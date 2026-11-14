@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-METHODOLOGY_VERSION = "0.2-proposal"  # 0.2: pixel-aligned sampling of near-native DEMs
+METHODOLOGY_VERSION = "0.3-proposal"  # decoded elevations; linear soft assignment for scoring
 
 BACKEND_DIR = Path(__file__).resolve().parent
 REFERENCES_DIR = BACKEND_DIR / "references"

@@ -88,7 +88,7 @@ def find_block(grid, raw):
 
 def scores(a, b):
     fa, fb = compute_features(a, "A"), compute_features(b, "B")
-    return {m: similarity.distribution_similarity(fa.histograms[m], fb.histograms[m]) for m in METRICS}
+    return {m: similarity.distribution_similarity(fa.scoring_histograms[m], fb.scoring_histograms[m]) for m in METRICS}
 
 
 @pytest.fixture(scope="module")
@@ -161,8 +161,8 @@ def test_earth_detail_is_removed_and_mars_detail_is_not_invented(scenario):
     with rasterio.open(earth.path) as ds:
         z10 = ds.read(1).astype(np.float64)[1000:2000, 1000:2000]
     naive = similarity.distribution_similarity(
-        tf.histogram_fractions(tf.slope_degrees(z10, EARTH_PIX), settings.SLOPE_BIN_EDGES_DEG)[0],
-        compute_features(m, "Mars").histograms["slope_distribution"],
+        tf.soft_histogram_fractions(tf.slope_degrees(z10, EARTH_PIX), settings.SLOPE_BIN_EDGES_DEG)[0],
+        compute_features(m, "Mars").scoring_histograms["slope_distribution"],
     )
     assert naive < 0.6 < with_texture["slope_distribution"]
 

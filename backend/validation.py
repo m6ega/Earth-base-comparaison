@@ -329,6 +329,9 @@ def open_earth_dem(
                 vertical_unit,
             )
 
+            scale, offset = float(ds.scales[0]), float(ds.offsets[0])
+            if not (math.isfinite(scale) and math.isfinite(offset)):
+                raise errors.fail(errors.INVALID_DEM, "Elevation scale and offset must be finite.")
             width, height = ds.width, ds.height
 
     except errors.TerraError:
@@ -348,10 +351,14 @@ def open_earth_dem(
         width,
         height,
         factor,
+        elevation_scale=scale,
+        elevation_offset=offset,
     )
 
     facts = {
         "vertical_to_metres": factor,
+        "elevation_scale": scale,
+        "elevation_offset": offset,
         "vertical_unit_source": unit_source,
         "crs_name": horizontal.name,
     }

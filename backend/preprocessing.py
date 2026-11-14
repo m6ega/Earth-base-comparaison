@@ -75,6 +75,8 @@ class DemSource:
     half_extent_m: float  # half side of the largest centred square inside the raster
     elevation_range_m: tuple[float, float] | None = None
     effective_resolution_m: float | None = None
+    elevation_scale: float = 1.0
+    elevation_offset: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -129,6 +131,8 @@ def describe_source(
     width: int,
     height: int,
     vertical_to_metres: float,
+    elevation_scale: float = 1.0,
+    elevation_offset: float = 0.0,
 ) -> DemSource:
     """Measure centre, physical pixel spacing and usable centred extent."""
     if width <= 0 or height <= 0 or not all(math.isfinite(v) for v in transform) or transform.determinant == 0:
@@ -195,6 +199,8 @@ def describe_source(
         body=body,
         horizontal_crs=horizontal_crs,
         vertical_to_metres=vertical_to_metres,
+        elevation_scale=elevation_scale,
+        elevation_offset=elevation_offset,
         center_lon=float(lon),
         center_lat=float(lat),
         local_crs_wkt=local.to_wkt(),
@@ -257,7 +263,13 @@ def _read_footprint(source: DemSource, half_side: float, margin_m: float):
 
     data = np.ma.filled(band.astype(np.float64), np.nan)
     data[~np.isfinite(data)] = np.nan
-    data *= source.vertical_to_metres
+    # Mask raw NoData before decoding. Rasterio reads encoded samples, not
+    # band-scaled physical values. Offset is in band units, before conversion.
+    valid = np.isfinite(data)
+    with np.errstate(over="ignore", invalid="ignore"):
+        data[valid] = (data[valid] * source.elevation_scale + source.elevation_offset) * source.vertical_to_metres
+    if not np.isfinite(data[valid]).all():
+        raise errors.fail(errors.INVALID_DEM, "Elevation scale/offset decoding produced non-finite values.")
     return data, win_transform
 
 

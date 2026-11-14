@@ -1,4 +1,4 @@
-﻿"""Universal registry and polar regressions; all Earth inputs are synthetic."""
+"""Universal registry and polar regressions; all Earth inputs are synthetic."""
 import hashlib
 import json
 import shutil
@@ -85,7 +85,12 @@ def test_actual_selected_analysis(synthetic_dem,rid):
     assert all(np.isfinite(v) and 0<=v<=1 for v in [data['total_similarity'],*data['scores'].values()])
     assert data['charts']['slope_distribution']['reference']==data['charts']['slope_distribution']['mars']
     assert any(w['code']=='COMPARISON_SCALE' for w in data['warnings'])
-    if rid=='mars-gale': assert data['total_similarity']==pytest.approx(0.3584422608885516,abs=1e-12)
+    assert {'DESCRIPTOR_SIMILARITY_ONLY','CROSS_REFERENCE_SCALE_CAUTION','SOFT_HISTOGRAM_SCORING'} <= {w['code'] for w in data['warnings']}
+    if rid=='mars-gale':
+        # Methodology 0.3 golden value; 0.2 hard assignment was 0.3584422608885516.
+        # Bins/weights were not fitted to this synthetic fixture.
+        assert settings.METHODOLOGY_VERSION=='0.3-proposal'
+        assert data['total_similarity']==pytest.approx(0.3962021713268066,abs=1e-12)
 
 @pytest.mark.parametrize('rid',['../moon-shackleton','/tmp/evil','MOON','moon-unknown','moon-shackleton/..'])
 def test_safe_identifiers(rid):

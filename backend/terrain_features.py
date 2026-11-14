@@ -109,3 +109,31 @@ def histogram_fractions(values: np.ndarray, bin_edges: list[float]) -> tuple[np.
     clipped = np.clip(v, edges[0], edges[-1])
     counts, _ = np.histogram(clipped, bins=edges)
     return counts / counts.sum(), int(v.size)
+
+
+def soft_histogram_fractions(values: np.ndarray, bin_edges: list[float]) -> tuple[np.ndarray, int]:
+    """Continuous linear assignment between the existing bin midpoints.
+
+    Each finite sample contributes total mass one to at most two adjacent
+    centers, proportional to proximity in physical units. Endpoint mass is
+    clamped. No learned bandwidth, pseudocount, or score calibration is used.
+    These masses are for scoring, not counts within the chart's intervals.
+    """
+    edges = np.asarray(bin_edges, dtype=np.float64)
+    if (edges.ndim != 1 or edges.size < 2 or not np.isfinite(edges).all()
+            or np.any(np.diff(edges) <= 0)):
+        raise ValueError("bin edges must be finite and strictly increasing")
+    centers = edges[:-1] + np.diff(edges) / 2
+    v = np.asarray(values, dtype=np.float64)
+    v = v[np.isfinite(v)]
+    if not v.size:
+        return np.zeros(centers.size), 0
+    if centers.size == 1:
+        return np.ones(1), int(v.size)
+    v = np.clip(v, centers[0], centers[-1])
+    right = np.clip(np.searchsorted(centers, v, side="right"), 1, centers.size - 1)
+    left = right - 1
+    weight = (v - centers[left]) / (centers[right] - centers[left])
+    mass = (np.bincount(left, weights=1 - weight, minlength=centers.size)
+            + np.bincount(right, weights=weight, minlength=centers.size))
+    return mass / v.size, int(v.size)
