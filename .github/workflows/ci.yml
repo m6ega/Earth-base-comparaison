@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: "3.14"
       - name: Install dependencies
-        run: pip install --only-binary=:all: -r backend/requirements-dev.txt
+        run: 'pip install --only-binary=:all: -r backend/requirements-dev.txt'
       - name: Validate planetary references (byte-level integrity)
         run: python backend/check_references.py
       - name: Run test suite
