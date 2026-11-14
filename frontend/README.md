@@ -1,10 +1,24 @@
 # Frontend
 
-**Status:** no code yet. Implementation starts in Phase 1, once the readiness criteria below are met.
+**Status (release candidate):** implemented as a static site without a build step:
+`index.html`, `style.css`, `script.js`, `config.js` and `assets/`. It performs no
+scientific calculations; it displays what the backend returns.
+
+- **Served by the backend** at `/` (same origin) in production and local runs:
+  `uvicorn app:app --app-dir backend` then open http://127.0.0.1:8000.
+- **Live Server / static dev server** (ports 5500, 5501, 5173, 4173): `config.js`
+  points API requests at port 8000 on the same host. Set
+  `window.TERRA_API_BASE_URL` before `script.js` to override.
+- **Behaviour:** references come from `GET /references`, grouped by `body`
+  (defaults: Gale Crater for Mars, Mons Mouton for the Moon). Switching planet or
+  reference never calls the API; only **Analyze Terrain** sends `POST /analyze` with
+  `file`, `reference_id` and `vertical_unit_fallback=metre`. Stale responses are
+  cancelled or discarded.
+
+The planning notes below predate implementation (the React + Vite plan was replaced by
+the static site) and are kept for history.
 
 **Owner:** Frontend & Data Lead + Codex, on `frontend--dev`. Scope, stack and responsibilities: [PROJECT-CONTEXT.md](../PROJECT-CONTEXT.md).
-
-The frontend is a React + Vite single-page application. It performs no scientific calculations; it displays what the backend returns.
 
 ## Required reading
 

@@ -1,15 +1,14 @@
 # Backend
 
-The universal planetary reference engine supports the approved `mars-gale`,
-`moon-mons-mouton` and `moon-shackleton` datasets on `frontend--dev`.
-See [PLANETARY-REFERENCES.md](PLANETARY-REFERENCES.md) for registry approval,
-polar geometry validation, exact API extensions and the frontend handoff.
-That document supersedes Mars-only implementation descriptions below; the
-methodology 0.2 feature formulas and sampling safeguard remain unchanged.
+The universal planetary reference engine serves four registered NASA-derived
+references: `mars-gale`, `mars-amazonis`, `moon-mons-mouton` and
+`moon-shackleton`. See [PLANETARY-REFERENCES.md](PLANETARY-REFERENCES.md) for
+registry approval, polar geometry validation and API extensions, and
+[SCIENTIFIC-FIXES-0.3.md](SCIENTIFIC-FIXES-0.3.md) for the methodology 0.3 changes.
 
-**Status:** Phase 1 terrain comparison engine implemented on `backend--dev`, pending human review. The scientific method below is a **proposal**: [docs/methodology.md](../docs/methodology.md) has not approved any formula, threshold or weight.
+**Status:** release candidate on `frontend--dev` (methodology `0.3-proposal`). The scientific method below is a **proposal**: [docs/methodology.md](../docs/methodology.md) has not approved any formula, threshold or weight.
 
-**Owner:** Backend Lead + Claude, on `backend--dev`. Scope, stack and responsibilities: [PROJECT-CONTEXT.md](../PROJECT-CONTEXT.md).
+**Deployment:** the API also serves the static frontend (same origin). See [DEPLOYMENT.md](../DEPLOYMENT.md). Scope and responsibilities: [PROJECT-CONTEXT.md](../PROJECT-CONTEXT.md).
 
 The backend implements the three MVP endpoints in the [API contract](../docs/api-contract.md). Every score is computed from real raster data. Responses always have `is_mock: false`.
 
@@ -63,14 +62,22 @@ python -m pytest tests -q
 python -m uvicorn app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-In another terminal at the repository root, serve the existing static frontend:
+The backend serves the frontend itself: open http://127.0.0.1:8000.
+
+Optional: to edit the frontend with VS Code Live Server (or
+`python -m http.server 5500 --bind 127.0.0.1 --directory frontend`), open
+http://127.0.0.1:5500. `frontend/config.js` sends API requests to port 8000 of the
+same host only when the page comes from a known static dev port (5500/5501/5173/4173);
+otherwise requests go to the page's own origin.
+
+Production-style start (no reload; same command as the Docker image), from the repository root:
 
 ```powershell
-python -m http.server 5500 --bind 127.0.0.1 --directory frontend
+python -m uvicorn app:app --app-dir backend --host 0.0.0.0 --port 8000
+python backend/check_references.py                                   # validate every registration
+python backend/smoke_test.py http://127.0.0.1:8000 path\to\earth.tif   # HTTP end-to-end check
 ```
 
-Open http://127.0.0.1:5500. `frontend/config.js` defaults to the backend at
-http://127.0.0.1:8000. Select an Earth GeoTIFF and click **Analyze Terrain**.
 The development and testing branch is `frontend--dev`; `main` is stable production.
 
 Test the API from a second PowerShell window. `curl.exe` is built into Windows 10 and later. Replace the path with your own GeoTIFF.
@@ -88,6 +95,12 @@ python -c "import sys; sys.path.insert(0,'tests'); from conftest import *; from 
 curl.exe -s -F "file=@synthetic_earth.tif" -F "reference_id=mars-gale" http://127.0.0.1:8000/analyze
 Remove-Item synthetic_earth.tif
 ```
+
+`POST /analyze` form fields: `file` (GeoTIFF, required), `reference_id` (required),
+`vertical_unit` (optional explicit selection, used only when the file declares no units)
+and `vertical_unit_fallback` (optional default, used only when the file declares no units
+and no `vertical_unit` is sent; reported as `VERTICAL_UNITS_ASSUMED`). Declared units
+always win, so a file declaring feet is never read as metres.
 
 CORS allows the local Vite (`5173`, `4173`) and Live Server (`5500`) origins on `localhost` and `127.0.0.1`, without credentials. To override, set a comma-separated list before starting the server, for example `$env:TERRA_CORS_ORIGINS = "http://localhost:3000"`. Wildcards are ignored.
 
@@ -151,7 +164,7 @@ Values above the last edge count in the last bin.
 - **Per metric:** `score = 1 − JSD₂(p_earth, p_mars)`, where `JSD₂` is the base-2 Jensen–Shannon *distance* (the square root of the divergence). It lies in [0, 1], so the score does too.
 - **Scoring distributions:** linear mass assignment between the midpoints of the listed bins, clamped at the first/last midpoint. Ordinary histogram fractions are retained for the slope chart. No pseudocount or fitted bandwidth is used.
 - **Total:** `total_similarity = (relative_relief + slope_distribution + surface_roughness) / 3`. These are equal weights, which is a proposal with no scientific claim.
-- **Score scale:** the contract specifies 0–1, and the frontend displays percentages. `100 × (1 − distance)` is the same number shown as a percentage.
+- **Score scale:** the contract specifies 0–1. The frontend displays `100 × score` as an index "out of 100" with one decimal. It is not a percentage of similarity, a probability or a confidence.
 - **Numerical checks:** distributions must be finite, non-negative and have mass. Scores must be finite and within [0, 1]. Responses are serialized with `allow_nan=False`. Any failure returns `PROCESSING_FAILED`, never a default score.
 - **Mars feature cache:** in memory (LRU), keyed by reference ID, resolution, cell count and `METHODOLOGY_VERSION`.
 - **What the score is not:** it is not a probability, a confidence or a statistical test. It is a bounded distance between two soft descriptor distributions: 1 means identical histograms, and 0 means no shared bins. It is not calibrated against any terrain-analog judgement and says nothing about site suitability.
@@ -172,7 +185,8 @@ Values above the last edge count in the last bin.
 | `EARTH_COARSER_THAN_REFERENCE` | The Earth DEM is coarser than Mars |
 | `FOOTPRINT_LIMITED_BY_EARTH` | The Earth DEM is smaller than the Mars reference |
 | `PARTIAL_COVERAGE` | 50–95% of the Earth window is valid |
-| `VERTICAL_UNITS_CONVERTED` | Elevations were converted from feet |
+| `VERTICAL_UNITS_CONVERTED` | Elevations were converted from feet (declared or explicitly selected) |
+| `VERTICAL_UNITS_ASSUMED` | The GeoTIFF declares no units and the request's `vertical_unit_fallback` (the website sends `metre`) was applied |
 | `FLAT_TERRAIN` / `REFERENCE_FLAT_TERRAIN` | Local relief everywhere is below 1 m on the named side |
 | `LOW_INFORMATION_TERRAIN` | A named metric has an exact single-bin chart distribution on either side |
 | `DESCRIPTOR_SIMILARITY_ONLY` | Always: descriptor agreement does not establish morphology/geology |
@@ -189,6 +203,7 @@ Values above the last edge count in the last bin.
 | 415 | `UNSUPPORTED_FORMAT` |
 | 422 | `MISSING_FIELD`, `INVALID_REQUEST`, `INVALID_DEM`, `MISSING_CRS`, `UNSUPPORTED_CRS`, `UNKNOWN_VERTICAL_UNITS`, `INSUFFICIENT_EXTENT`, `INSUFFICIENT_VALID_DATA` |
 | 500 | `REFERENCE_UNAVAILABLE`, `PROCESSING_FAILED` |
+| 503 | `SERVER_BUSY` (all analysis slots busy for longer than `TERRA_ANALYSIS_QUEUE_TIMEOUT_S`) |
 
 Every error uses the contract's error shape and never exposes paths or stack traces.
 
