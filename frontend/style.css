@@ -14,6 +14,22 @@
     --orange: #f29b54;
 }
 
+[hidden] { display: none !important; }
+button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.welcome-section { flex-wrap: wrap; }
+.analysis-status { line-height: 1.6; overflow-wrap: anywhere; }
+.analysis-status.error { border-color: #ef5350; color: #ffb4b4; }
+.panel-header h3 { overflow-wrap: anywhere; }
+.slope-chart { font-size: 11px; }
+.slope-chart p { color: var(--muted); margin-bottom: 16px; }
+.slope-row { display: grid; grid-template-columns: 65px 1fr 55px; gap: 8px; align-items: center; margin: 10px 0; }
+.slope-track { background: #25364a; height: 9px; border-radius: 4px; }
+.slope-fill { height: 100%; background: var(--cyan); border-radius: 4px; }
+#marsChart .slope-fill { background: var(--orange); }
+#sciencePanel { line-height: 1.6; }
+#sciencePanel p, #warningsList { margin-top: 14px; }
+#warningsList { padding-left: 20px; }
+
 /* GENERAL */
 
 * {

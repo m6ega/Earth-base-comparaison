@@ -64,7 +64,12 @@
                 Upload Earth DEM
             </button>
 
+            <button class="primary-button" id="analyzeBtn" disabled>Analyze Terrain</button>
             <input type="file" id="demInput" accept=".tif,.tiff" hidden>
+        </section>
+
+        <section class="panel analysis-status" aria-live="polite" aria-atomic="true">
+            <p id="analysisStatus">Select an Earth GeoTIFF (.tif or .tiff), maximum 50 MB.</p>
         </section>
 
 
@@ -96,11 +101,10 @@
 
                     <div class="map-placeholder">
                         <img
-                            src="../mars-source/mars-gale-preview.png"
+                            id="marsPreview" hidden
                             alt="Mars Gale Crater elevation preview"
-                            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
                         >
-                        <div class="map-fallback">
+                        <div class="map-fallback" id="marsFallback" style="display:flex">
                             MARS TERRAIN DATA
                             <span>Reference DEM</span>
                         </div>
@@ -136,6 +140,7 @@
                     </div>
 
                     <div class="map-placeholder earth-placeholder">
+                        <img id="earthPreview" alt="Analyzed Earth terrain preview" hidden>
                         <div class="upload-message" id="uploadMessage">
                             <span class="upload-icon">+</span>
                             <h3>Upload a DEM file</h3>
@@ -168,7 +173,7 @@
         </section>
 
 
-        <section class="results-section">
+        <section class="results-section" hidden>
 
             <div class="section-heading">
                 <div>
@@ -205,7 +210,7 @@
 
                     <div class="metric">
                         <div class="metric-heading">
-                            <span>Elevation</span>
+                            <span>Relative Relief</span>
                             <span id="elevationValue">--</span>
                         </div>
                         <div class="progress-bar">
@@ -225,7 +230,7 @@
 
                     <div class="metric">
                         <div class="metric-heading">
-                            <span>Slope</span>
+                            <span>Slope Distribution</span>
                             <span id="slopeValue">--</span>
                         </div>
                         <div class="progress-bar">
@@ -236,7 +241,7 @@
                     <div class="metric">
                         <div class="metric-heading">
                             <span>Environmental Similarity</span>
-                            <span id="environmentValue">--</span>
+                            <span id="environmentValue">N/A</span>
                         </div>
                         <div class="progress-bar">
                             <div class="progress-fill" id="environmentBar"></div>
@@ -249,12 +254,12 @@
         </section>
 
 
-        <section class="profiles-section">
+        <section class="profiles-section" hidden>
 
             <div class="section-heading">
                 <div>
-                    <p class="section-number">03 / ELEVATION ANALYSIS</p>
-                    <h2>Terrain Profiles</h2>
+                    <p class="section-number">03 / SLOPE ANALYSIS</p>
+                    <h2>Slope Distribution</h2>
                 </div>
             </div>
 
@@ -262,23 +267,25 @@
 
                 <article class="panel profile-panel">
                     <span class="planet-tag mars-tag">MARS</span>
-                    <h3>Gale Crater Elevation Profile</h3>
-                    <div class="chart-placeholder">
-                        <p>Elevation profile will appear here</p>
-                    </div>
+                    <h3>Gale Crater Slope Distribution</h3>
+                    <div class="slope-chart" id="marsChart"></div>
                 </article>
 
                 <article class="panel profile-panel">
                     <span class="planet-tag earth-tag">EARTH</span>
-                    <h3>Earth Region Elevation Profile</h3>
-                    <div class="chart-placeholder">
-                        <p>Upload a DEM to generate a profile</p>
-                    </div>
+                    <h3>Earth Region Slope Distribution</h3>
+                    <div class="slope-chart" id="earthChart"></div>
                 </article>
 
             </div>
         </section>
 
+        <section class="panel" id="sciencePanel" hidden>
+            <h3>Scientific interpretation and warnings</h3>
+            <p id="referenceMetadata"></p>
+            <p>Earth data: user-uploaded DEM. Mars source: NASA MOLA. Scores describe terrain geometry only, not environmental similarity, habitability, safety or construction suitability. Results depend on resolution, study area and methodology.</p>
+            <ul id="warningsList"></ul>
+        </section>
 
         <footer>
             <span>TERRA ANALOG</span>
@@ -287,6 +294,7 @@
 
     </main>
 
+    <script src="config.js"></script>
     <script src="script.js"></script>
 
 </body>
