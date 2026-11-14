@@ -37,8 +37,7 @@ jobs:
         run: |
           if ! docker build --progress=plain -t terra-analog:ci . > build.log 2>&1; then
             # Surface the failure as an annotation (readable without log access).
-            echo "::error title=docker build failed::$(tail -c 4000 build.log | sed 's/%/%25/g' | tr '
-' '|')"
+            echo "::error title=docker build failed::$(tail -c 4000 build.log | sed 's/%/%25/g' | tr '\n' '|')"
             exit 1
           fi
       - name: Start container
@@ -52,8 +51,7 @@ jobs:
       - name: Smoke test all references through HTTP
         run: |
           if ! python backend/smoke_test.py http://127.0.0.1:8000 /tmp/earth.tif > smoke.log 2>&1; then
-            echo "::error title=smoke test failed::$(tail -c 3000 smoke.log | sed 's/%/%25/g' | tr '
-' '|')"
+            echo "::error title=smoke test failed::$(tail -c 3000 smoke.log | sed 's/%/%25/g' | tr '\n' '|')"
             exit 1
           fi
           cat smoke.log
