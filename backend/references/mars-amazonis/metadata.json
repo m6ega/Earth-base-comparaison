@@ -1,0 +1,106 @@
+{
+  "reference_id": "mars-amazonis",
+  "planet": "Mars",
+  "region": "Amazonis Planitia",
+  "display_name": "Amazonis Planitia",
+  "category": "Smooth volcanic plains",
+  "description": "Approximately 100 km sample of low-relief Amazonis plains near 19 N, 203 E.",
+  "dataset": "MOLA MEGDR MEG128 topography",
+  "source": "NASA MGS MOLA MEGDR, MGS-M-MOLA-5-MEGDR-L3-V1.0",
+  "source_file": "megt44n180hb.img",
+  "source_label": "megt44n180hb (1).lbl",
+  "source_product_id": "MEGT44N180HB.IMG",
+  "source_product_version": "2.0",
+  "source_urls": [
+    "https://pds-geosciences.wustl.edu/missions/mgs/megdr.html",
+    "https://planetarynames.wr.usgs.gov/Feature/220",
+    "https://www.usgs.gov/maps/geologic-map-amazonis-quadrangle-mars"
+  ],
+  "source_sha256": {
+    "megt44n180hb (1).lbl": "7baf5c98a89bd903b81f654c4f7b79274b32d24d64e3eb98694cd44865afdbdf",
+    "megt44n180hb.hdr": "68e881ce834734e49cb2b0db6d48daa7cda1530a3af3097ca5e5c9ba631965c8",
+    "megt44n180hb.img": "951de9b021808027f4b96e4fa82e1f4f9e621b2ddf978bc2ef235cd3d7dbf3c5"
+  },
+  "center": {
+    "latitude_planetocentric": 19.0,
+    "longitude_positive_east": 203.0
+  },
+  "geographic_bounds": {
+    "west": 202.109375,
+    "east": 203.890625,
+    "south": 18.15625,
+    "north": 19.84375
+  },
+  "elevation": {
+    "unit": "metres",
+    "reference": "GMM3 (mgm1025) Mars areoid, degree/order 50",
+    "minimum": -3925.0,
+    "maximum": -3747.0,
+    "mean": -3804.6709917153994,
+    "source_data_type": "Signed 16-bit integer",
+    "byte_order": "Big-endian",
+    "scale_factor": 1,
+    "offset": 0
+  },
+  "raster": {
+    "width": 228,
+    "height": 216,
+    "resolution_metres": [
+      463.05766716974557,
+      463.05766716974557
+    ],
+    "native_spacing_degrees": [
+      0.0078125,
+      0.0078125
+    ],
+    "crop_size_requested_km": 100,
+    "nodata": -32768.0,
+    "valid_pixels": 49248,
+    "nodata_pixels": 0,
+    "ground_spacing_at_center_metres": [
+      437.8296258826804,
+      463.05766716974557
+    ],
+    "approximate_ground_footprint_km": [
+      99.82515470125112,
+      100.02045610866504
+    ],
+    "east_west_width_south_north_km": [
+      100.32049017710241,
+      99.30817139133684
+    ]
+  },
+  "coordinate_system": {
+    "projection": "Mars simple cylindrical / equirectangular",
+    "central_meridian_degrees": 180,
+    "mars_radius_metres": 3396000,
+    "crs_wkt": "PROJCRS[\"unknown\",BASEGEOGCRS[\"unknown\",DATUM[\"unknown\",ELLIPSOID[\"unknown\",3396000,0,LENGTHUNIT[\"metre\",1,ID[\"EPSG\",9001]]]],PRIMEM[\"Reference meridian\",0,ANGLEUNIT[\"degree\",0.0174532925199433,ID[\"EPSG\",9122]]]],CONVERSION[\"unknown\",METHOD[\"Equidistant Cylindrical (Spherical)\",ID[\"EPSG\",1029]],PARAMETER[\"Latitude of 1st standard parallel\",0,ANGLEUNIT[\"degree\",0.0174532925199433],ID[\"EPSG\",8823]],PARAMETER[\"Longitude of natural origin\",180,ANGLEUNIT[\"degree\",0.0174532925199433],ID[\"EPSG\",8802]],PARAMETER[\"False easting\",0,LENGTHUNIT[\"metre\",1],ID[\"EPSG\",8806]],PARAMETER[\"False northing\",0,LENGTHUNIT[\"metre\",1],ID[\"EPSG\",8807]]],CS[Cartesian,2],AXIS[\"(E)\",east,ORDER[1],LENGTHUNIT[\"metre\",1,ID[\"EPSG\",9001]]],AXIS[\"(N)\",north,ORDER[2],LENGTHUNIT[\"metre\",1,ID[\"EPSG\",9001]]]]"
+  },
+  "effective_resolution_m": null,
+  "selection_diagnostics": {
+    "slope_degrees_percentiles_50_95_99_100": [
+      0.0654315642643375,
+      0.26893703739500247,
+      0.5324239590939743,
+      6.969067244528346
+    ],
+    "initial_candidate": "16 N, 202 E: elevation -4545 to -3413 m, maximum grid-gradient slope 35.93 degrees; rejected for sharp terrain.",
+    "final_reason": "19 N, 203 E has 178 m total relief across approximately 100 km and 95th percentile grid-gradient slope about 0.27 degrees; avoids the major sharp features in tested southern/western candidates."
+  },
+  "processing": [
+    "Validated PDS dimensions 11520 x 5632, MSB_INTEGER 16 bits, METER, record bytes 23040 and exact IMG size 129761280.",
+    "HDR agrees on binary layout but explicitly omits georeferencing; PDS bounds and half-pixel projection offsets define pixel-area edges 180..270 E and 0..44 N.",
+    "PDS IMAGE specifies direct metre topography with no scaling/offset keywords: identity conversion, not radius or counts.",
+    "Extracted integer window row=3092, col=2830, height=216, width=228; no DEM reprojection, resampling, smoothing, interpolation or upsampling.",
+    "Native equirectangular pixel dimensions retained; differing longitudinal ground spacing is explicitly recorded."
+  ],
+  "data_quality_notes": [
+    "Native topography includes upstream interpolation where no MOLA shots exist; no per-cell observation mask was supplied.",
+    "Effective resolution unknown: 128 pixels per degree is grid spacing, not verified effective resolution.",
+    "No PDS missing-value constant or HDR ignore value is declared. All crop values retained, including valid zero; -32768 is an unused output sentinel, not an inferred source mask.",
+    "Crop selected from nearby candidates using actual topographic relief and gradient diagnostics. It is a regional smooth-plains sample, not crater-free ground at sub-grid scales.",
+    "Preview colour stretch uses 2nd-98th percentiles for visibility; it does not change DEM measurements. Display-only nearest-neighbour column selection corrects centre ground aspect ratio.",
+    "Terrain category describes regional volcanic-plains context, not mineralogical validation of every pixel."
+  ],
+  "citation": "NASA/MGS MOLA Science Team, David E. Smith, GSFC; MEGDR v2.0, created 2003-03-21."
+}

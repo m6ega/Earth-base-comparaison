@@ -276,6 +276,7 @@ temp/
 !/backend/references/mars-gale/dem.tif
 !/backend/references/moon-mons-mouton/dem.tif
 !/backend/references/moon-shackleton/dem.tif
+!/backend/references/mars-amazonis/dem.tif
 
 # Organizer source products remain local; only validated runtime crops are tracked.
 /raw-moon-data/

@@ -64,8 +64,16 @@ def test_references():
     assert r.status_code == 200
     body = r.json()
     assert body["is_mock"] is False
-    assert [ref["id"] for ref in body["references"]] == ["mars-gale", "moon-mons-mouton", "moon-shackleton"]
-    assert body["references"][0]["preview_url"] == "/static/references/mars-gale/preview.png"
+    assert [ref["id"] for ref in body["references"]] == [
+        "mars-amazonis", "mars-gale", "moon-mons-mouton", "moon-shackleton",
+    ]
+    assert {ref["id"]: ref["body"] for ref in body["references"]} == {
+        "mars-amazonis": "mars", "mars-gale": "mars",
+        "moon-mons-mouton": "moon", "moon-shackleton": "moon",
+    }
+    previews = {ref["id"]: ref["preview_url"] for ref in body["references"]}
+    assert previews["mars-gale"] == "/static/references/mars-gale/preview.png"
+    assert previews["mars-amazonis"] == "/static/references/mars-amazonis/preview.png"
 
 
 def test_reference_preview_served_but_not_dem():
