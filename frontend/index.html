@@ -58,6 +58,9 @@
         </symbol>
     </svg>
 
+    <!-- Planet atmosphere: a faint, non-interactive glow behind all content (Moon mode). -->
+    <div class="planet-glow" aria-hidden="true"></div>
+
     <a class="skip-link" href="#main">Skip to content</a>
 
     <header class="site-header">
@@ -95,7 +98,7 @@
 
                 <p class="eyebrow" id="heroEyebrow">
                     <span class="eyebrow__rule" aria-hidden="true"></span>
-                    <span id="heroEyebrowLabel">Gale Crater reference · NASA MOLA</span>
+                    <span id="heroEyebrowLabel">Planetary terrain references</span>
                 </p>
 
                 <h1 class="hero__title" id="heroTitle">
@@ -122,13 +125,13 @@
                         <span class="btn__label" id="analyzeLabel">Analyze Terrain</span>
                     </button>
 
-                    <!-- Visual planet selector. Moon analysis is not implemented yet. -->
+                    <!-- Planet switch: changes which references are offered. Never starts an analysis. -->
                     <button
                         type="button"
                         class="btn btn--secondary planet-toggle"
                         id="planetToggleBtn"
                         aria-label="Switch comparison target"
-                        aria-controls="marsFrame"
+                        aria-controls="refList"
                         aria-pressed="false"
                     >
                         <span class="btn__label" id="planetToggleLabel">Switch to Moon</span>
@@ -137,9 +140,33 @@
                     <input type="file" id="demInput" accept=".tif,.tiff,image/tiff" hidden>
                 </div>
 
+                <!-- Reference selection: populated from GET /references for the active planet. -->
+                <div class="ref-picker" id="refPicker">
+                    <div class="ref-picker__head">
+                        <p class="ref-picker__title" id="refPickerTitle">
+                            <span class="ref-picker__dot" aria-hidden="true"></span>
+                            Choose reference
+                        </p>
+                        <p class="ref-picker__meta" id="refPickerMeta">Loading references…</p>
+                    </div>
+
+                    <div
+                        class="ref-picker__list"
+                        id="refList"
+                        role="radiogroup"
+                        aria-labelledby="refPickerTitle"
+                        aria-describedby="refPickerMeta"
+                    ></div>
+
+                    <p class="ref-picker__status" id="refStatus" hidden>
+                        <span id="refStatusText"></span>
+                        <button type="button" class="link-button" id="refRetryBtn" hidden>Retry</button>
+                    </p>
+                </div>
+
                 <div class="selection" aria-live="polite">
                     <p class="selection__hint" id="fileHint">
-                        GeoTIFF elevation model (.tif, .tiff), up to 50 MB. Compared with the Gale Crater reference.
+                        GeoTIFF elevation model (.tif, .tiff), up to 50 MB. Elevations are read as metres unless the file declares its units.
                     </p>
 
                     <div class="file-chip" id="fileChip" hidden>
@@ -155,28 +182,6 @@
                         </span>
                     </div>
                 </div>
-
-                <!-- Elevation-unit selector -->
-                <fieldset class="unit-choice" id="unitChoice" hidden>
-                    <legend class="unit-choice__title">Elevation units not declared</legend>
-
-                    <p class="unit-choice__description">
-                        This GeoTIFF does not specify the units used for its elevation values.
-                        Select the correct unit so Terra Analog can convert the elevations accurately.
-                    </p>
-
-                    <label class="unit-choice__label" for="verticalUnit">Elevation unit</label>
-
-                    <select class="unit-choice__select" id="verticalUnit" name="vertical_unit">
-                        <option value="">Choose elevation units</option>
-                        <option value="metre">Metres (m)</option>
-                        <option value="foot">Feet (ft)</option>
-                    </select>
-
-                    <p class="unit-choice__hint">
-                        Check your DEM's source documentation if you are unsure. Terra Analog will not guess.
-                    </p>
-                </fieldset>
 
                 <div class="notice" id="notice" role="alert" hidden>
                     <svg class="notice__icon" aria-hidden="true"><use href="#i-alert"/></svg>
@@ -214,10 +219,10 @@
                                 <span id="planetTagLabel">Mars reference</span>
                             </p>
 
-                            <h3 class="terrain__title" id="marsTitle">Gale Crater</h3>
+                            <h3 class="terrain__title" id="marsTitle">Reference terrain</h3>
 
                             <p class="terrain__coords mono" id="marsCoords" title="Centre from the verified reference metadata">
-                                5.44° S · 137.70° E
+                                —
                             </p>
                         </header>
 
@@ -229,7 +234,7 @@
                                 <img
                                     class="frame__img"
                                     id="marsPreview"
-                                    alt="Elevation preview of the Gale Crater reference on Mars (NASA MOLA)"
+                                    alt=""
                                     hidden
                                 >
 
@@ -241,13 +246,13 @@
                                     </span>
                                 </div>
 
-                                <!-- Moon visual placeholder: decorative only, no lunar data -->
+                                <!-- Moon fallback illustration: shown only when no lunar reference is available -->
                                 <div
                                     class="moon-placeholder"
                                     id="moonPlaceholder"
                                     hidden
                                     role="img"
-                                    aria-label="Illustrative grey Moon sphere with a cratered surface. Lunar analysis is not available yet."
+                                    aria-label="Illustrative grey Moon sphere. No lunar reference is currently available."
                                 >
                                     <div class="moon-placeholder__scene" aria-hidden="true">
                                         <div class="moon-placeholder__sphere">
@@ -261,7 +266,7 @@
 
                                     <p class="moon-placeholder__title">Lunar reference preview</p>
                                     <p class="moon-placeholder__note" id="moonPlaceholderText">
-                                        Visual placeholder only — lunar reference data and analysis are not available yet.
+                                        Illustration only — no lunar reference is available from the analysis engine.
                                     </p>
                                 </div>
 
@@ -269,7 +274,7 @@
 
                             <figcaption class="figure__bar">
                                 <span class="figure__caption" id="marsFigureCaption">
-                                    Full reference crop · <span class="mono">≈100 km</span> across
+                                    Full reference crop · DEM-derived preview
                                 </span>
 
                                 <button
@@ -294,7 +299,7 @@
 
                             <div>
                                 <dt>Grid spacing</dt>
-                                <dd class="mono" id="marsGridSpacing">463 m</dd>
+                                <dd class="mono" id="marsGridSpacing">—</dd>
                             </div>
 
                             <div>
@@ -423,11 +428,30 @@
                             Experimental terrain similarity index. It compares terrain geometry only and is not a probability,
                             a habitability assessment or a landing-site rating.
                         </p>
+
+                        <p class="score__note" id="scoreNote">
+                            <svg class="score__note-icon" aria-hidden="true"><use href="#i-info"/></svg>
+                            <span>Similarity measures statistical terrain resemblance, not scientific accuracy or geological equivalence.</span>
+                        </p>
+
+                        <!-- Shown only when the backend (or the metres default) flags a relevant condition. -->
+                        <details class="disclosure sci-notes" id="sciNotes" hidden>
+                            <summary>
+                                <span class="sci-notes__summary">
+                                    <svg class="sci-notes__icon" aria-hidden="true"><use href="#i-alert"/></svg>
+                                    <span>Scientific notes</span>
+                                    <span class="count" id="sciNotesCount">0</span>
+                                </span>
+                                <svg class="disclosure__chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+                            </summary>
+
+                            <ul class="sci-notes__list" id="sciNotesList"></ul>
+                        </details>
                     </div>
 
                     <dl class="comparison" aria-label="What was compared">
                         <div>
-                            <dt>Mars reference</dt>
+                            <dt id="cmpReferenceLabel">Planetary reference</dt>
                             <dd id="cmpReference">—</dd>
                         </div>
 
@@ -516,7 +540,7 @@
                         <ul class="legend" aria-label="Legend">
                             <li>
                                 <span class="legend__swatch legend__swatch--mars" aria-hidden="true"></span>
-                                <span id="legendMars">Mars · Gale Crater</span>
+                                <span id="legendMars">Reference</span>
                             </li>
 
                             <li>
@@ -549,7 +573,7 @@
                                 <thead>
                                     <tr>
                                         <th scope="col">Slope range</th>
-                                        <th scope="col">Mars</th>
+                                        <th scope="col" id="tableRefHead">Reference</th>
                                         <th scope="col">Earth</th>
                                     </tr>
                                 </thead>
@@ -583,7 +607,7 @@
                             <p id="referenceMetadata"></p>
 
                             <p>
-                                Earth data is the uploaded DEM; Mars data is NASA MOLA.
+                                <span id="referenceSource">Earth data is the uploaded DEM.</span>
                                 Scores describe terrain geometry only. They do not indicate environmental similarity,
                                 habitability, safety or construction suitability, and they depend on resolution,
                                 study area and methodology.
@@ -634,8 +658,8 @@
         <div class="dialog__body">
             <p>
                 Terra Analog compares the shape of an Earth landscape with a planetary terrain reference.
-                Mars elevations come from the NASA Mars Global Surveyor MOLA gridded topography (MEGDR).
-                Earth elevations come from the GeoTIFF you upload. The file is processed for the request only.
+                Planetary elevations come from registered reference DEMs, such as NASA MOLA for Mars
+                and NASA LRO LOLA for the Moon. Earth elevations come from the GeoTIFF you upload. The file is processed for the request only.
             </p>
 
             <h3>How it compares</h3>

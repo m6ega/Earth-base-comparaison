@@ -6,14 +6,26 @@
 
     // ---- Configuration ----------------------------------------------------------------
     const API_BASE = String(window.TERRA_API_BASE_URL || '').replace(/\/+$/, '') + '/';
-    const REFERENCE_ID = 'mars-gale';
     const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
-    const MARS_PREVIEW_EXTENT_KM = 100;
+
+    // Elevation units: metres by default. The value is only sent when the backend
+    // reports that the GeoTIFF declares no units; declared units (e.g. feet) are
+    // always honoured by the backend and never overridden from here.
+    const DEFAULT_VERTICAL_UNIT = 'metre';
+
+    // Planets reachable with the hero switch. References are grouped by the
+    // `body` field returned by GET /references, never by their id.
+    const PLANETS = {
+        mars: { label: 'Mars', other: 'moon' },
+        moon: { label: 'Moon', other: 'mars' },
+    };
 
     const WARNING_TITLES = {
         METHODOLOGY_PROVISIONAL: 'Provisional methodology',
         COMPARISON_SCALE: 'Comparison scale',
-        EFFECTIVE_RESOLUTION_UNVERIFIED: 'Mars effective resolution unverified',
+        EFFECTIVE_RESOLUTION_UNVERIFIED: 'Reference effective resolution unverified',
+        REFERENCE_LIMITATION: 'Reference limitation',
+        VERTICAL_UNITS_ASSUMED: 'Elevation units assumed',
         RESOLUTION_REDUCED: 'Earth detail reduced',
         EARTH_COARSER_THAN_REFERENCE: 'Earth DEM coarser than reference',
         FOOTPRINT_LIMITED_BY_EARTH: 'Comparison area limited by the Earth DEM',
@@ -22,6 +34,34 @@
         VERTICAL_UNITS_CONVERTED: 'Vertical units converted',
         FLAT_TERRAIN: 'Essentially flat terrain',
     };
+
+    // Scientific notes: condition-specific cautions shown near the score. Each is
+    // triggered only by warning codes actually returned by the backend (or the
+    // frontend's own metres default), never inferred from the data here.
+    const SCIENTIFIC_NOTES = [
+        {
+            kind: 'terrain',
+            codes: ['FLAT_TERRAIN', 'LOW_INFORMATION_TERRAIN'],
+            title: 'Flat or low-information terrain can produce misleadingly high similarity.',
+        },
+        {
+            kind: 'scale',
+            // RESOLUTION_REDUCED is deliberately excluded: it accompanies almost every
+            // analysis (routine downsampling) and would make this note ever-present.
+            codes: ['CROSS_REFERENCE_SCALE_CAUTION', 'FOOTPRINT_LIMITED_BY_EARTH', 'EARTH_COARSER_THAN_REFERENCE'],
+            title: 'Scores obtained at different physical scales should not be directly ranked.',
+        },
+        {
+            kind: 'units-assumed',
+            codes: ['VERTICAL_UNITS_ASSUMED'],
+            title: 'Elevations were interpreted as metres because the file does not declare its vertical units.',
+        },
+        {
+            kind: 'units-converted',
+            codes: ['VERTICAL_UNITS_CONVERTED', 'ELEVATION_ENCODING_APPLIED'],
+            title: 'Elevation values were converted before analysis.',
+        },
+    ];
 
     const $ = (id) => document.getElementById(id);
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -44,9 +84,6 @@
         noticeTitle: $('noticeTitle'),
         noticeMessage: $('noticeMessage'),
 
-        unitChoice: $('unitChoice'),
-        verticalUnit: $('verticalUnit'),
-
         engine: $('engineStatus'),
         engineLabel: $('engineLabel'),
         extentNote: $('extentNote'),
@@ -58,8 +95,10 @@
         marsPlaceholderText: $('marsPlaceholderText'),
         marsDataset: $('marsDataset'),
         marsEffective: $('marsEffective'),
+        marsGridSpacing: $('marsGridSpacing'),
+        marsExpand: $('marsExpand'),
 
-        // Planet visual toggle
+        // Planet switch
         planetName: $('planetName'),
         planetToggleBtn: $('planetToggleBtn'),
         planetToggleLabel: $('planetToggleLabel'),
@@ -68,6 +107,20 @@
         marsCoords: $('marsCoords'),
         marsFacts: $('marsFacts'),
         marsFigureCaption: $('marsFigureCaption'),
+        eyebrowLabel: $('heroEyebrowLabel'),
+        fileHint: $('fileHint'),
+
+        // Reference picker
+        refList: $('refList'),
+        refPickerMeta: $('refPickerMeta'),
+        refStatus: $('refStatus'),
+        refStatusText: $('refStatusText'),
+        refRetryBtn: $('refRetryBtn'),
+
+        // Hero orbit
+        hero: $('top'),
+        orbit: document.querySelector('.hero__orbit'),
+        companion: document.querySelector('.hero__companion'),
 
         // Earth panel
         earthTitle: $('earthTitle'),
@@ -90,6 +143,9 @@
         scoreValue: $('scoreValue'),
 
         cmpReference: $('cmpReference'),
+        cmpReferenceLabel: $('cmpReferenceLabel'),
+        tableRefHead: $('tableRefHead'),
+        referenceSource: $('referenceSource'),
         cmpEarth: $('cmpEarth'),
         cmpWindow: $('cmpWindow'),
         cmpGrid: $('cmpGrid'),
@@ -100,6 +156,9 @@
         legendMars: $('legendMars'),
 
         limitations: $('limitations'),
+        sciNotes: $('sciNotes'),
+        sciNotesList: $('sciNotesList'),
+        sciNotesCount: $('sciNotesCount'),
         warningCount: $('warningCount'),
         warnings: $('warningsList'),
         referenceMetadata: $('referenceMetadata'),
@@ -115,18 +174,29 @@
     };
 
     const state = {
-        phase: 'idle',
-        file: null,
-        chartData: null,
+        // Core UI state
+        activePlanet: 'mars',
+        selectedReferenceId: null,
+        selectedEarthFile: null,
+        currentAnalysisResult: null,
+        analysisStatus: 'idle', // idle | selected | analyzing | success | error
+
+        // Reference catalogue from GET /references
+        references: [],
+        referencesStatus: 'loading', // loading | ready | error
+        lastSelection: { mars: null, moon: null },
+
+        // Request bookkeeping: `counter` identifies the live request; any
+        // response whose run id differs is stale and is discarded.
         counter: 0,
+        controller: null,
         retryable: true,
-        visualPlanet: 'mars',
+        chartData: null,
+        chartLabel: 'Reference',
     };
 
-    // Preserve the original Mars heading and caption.
+    // Preserve the original Mars heading.
     const originalPlanetName = ui.planetName?.textContent || 'Mars.';
-    const originalPlanetTag = ui.planetTagLabel?.textContent || 'Mars reference';
-    const originalMarsCaption = ui.marsFigureCaption?.textContent || '';
 
     // ---- Small helpers -----------------------------------------------------------------
 
@@ -151,6 +221,18 @@
         });
     };
 
+    // Scrolls to the top of the two comparison cards. Skipped when they are
+    // already in place, so retries never cause a redundant jump.
+    function scrollToComparison() {
+        const grid = document.querySelector('.terrain-grid');
+        if (!grid) return;
+
+        const offset = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+        if (Math.abs(grid.getBoundingClientRect().top - offset) < 4) return;
+
+        scrollToEl(grid);
+    }
+
     class AnalysisError extends Error {
         constructor(message, title = 'Analysis failed', code = '', retryable = true) {
             super(message);
@@ -160,13 +242,24 @@
         }
     }
 
-    // ---- Planet visual toggle -----------------------------------------------------------
+    // ---- Planet & reference selection ----------------------------------------------------
+    // Changing the planet or the reference is a local state change only: it never
+    // calls POST /analyze. It invalidates any result (or in-flight request) that
+    // belongs to the previous reference and keeps the selected Earth file.
+
+    const planetLabel = (body) =>
+        PLANETS[body]?.label || (body ? body.charAt(0).toUpperCase() + body.slice(1) : 'Planetary');
+
+    const referenceById = (id) =>
+        state.references.find((r) => r.id === id) || null;
+
+    const referencesFor = (planet) =>
+        state.references.filter((r) => r.body === planet);
 
     function setPlanet(planet) {
-        if (planet !== 'mars' && planet !== 'moon') return;
+        if (!PLANETS[planet]) return;
 
-        state.visualPlanet = planet;
-
+        state.activePlanet = planet;
         const isMoon = planet === 'moon';
 
         ui.body.dataset.planet = planet;
@@ -176,91 +269,363 @@
             ui.planetName.classList.toggle('is-moon', isMoon);
         }
 
+        const other = PLANETS[planet].other;
+
         if (ui.planetToggleLabel) {
-            ui.planetToggleLabel.textContent = isMoon
-                ? 'Switch to Mars'
-                : 'Switch to Moon';
+            ui.planetToggleLabel.textContent = `Switch to ${planetLabel(other)}`;
         }
 
         if (ui.planetToggleBtn) {
             ui.planetToggleBtn.setAttribute('aria-pressed', String(isMoon));
             ui.planetToggleBtn.setAttribute(
                 'aria-label',
-                isMoon ? 'Switch comparison display to Mars' : 'Switch comparison display to the Moon'
+                isMoon ? 'Switch comparison target to Mars' : 'Switch comparison target to the Moon'
             );
         }
 
-        if (ui.planetTagLabel) {
-            ui.planetTagLabel.textContent = isMoon
-                ? 'Moon preview'
-                : originalPlanetTag;
+        // Restore the last valid selection for this planet, else its first reference.
+        const refs = referencesFor(planet);
+        const next =
+            refs.find((r) => r.id === state.lastSelection[planet]) ||
+            refs[0] ||
+            null;
+
+        renderReferenceList();
+        selectReference(next ? next.id : null, { refresh: true });
+    }
+
+    function selectReference(id, { refresh = false, focus = false } = {}) {
+        const ref = id ? referenceById(id) : null;
+        const nextId = ref ? ref.id : null;
+        const changed = nextId !== state.selectedReferenceId;
+
+        if (!changed && !refresh) return;
+
+        state.selectedReferenceId = nextId;
+        if (ref) state.lastSelection[ref.body] = ref.id;
+
+        if (changed) invalidateAnalysis();
+
+        updateReferenceCards(focus);
+        renderReferencePanel(ref);
+        updateHeroCopy(ref);
+        setPhase(state.analysisStatus);
+    }
+
+    // Drop results and cancel any request made for the previous reference.
+    function invalidateAnalysis() {
+        const status = state.analysisStatus;
+        const wasBusy = status === 'analyzing';
+
+        state.counter++; // any response still on its way is now stale
+
+        if (state.controller) {
+            state.controller.abort();
+            state.controller = null;
         }
 
-        // Update the hero description for the selected visual target.
-        $('heroEyebrowLabel').textContent = isMoon
-            ? 'Lunar visual preview · analysis coming soon'
-            : 'Gale Crater reference · NASA MOLA';
+        state.currentAnalysisResult = null;
+        clearResults();
 
-        // Make the upload hint clear that Moon analysis is not available.
-        $('fileHint').textContent = isMoon
-            ? 'GeoTIFF elevation model (.tif, .tiff), up to 50 MB. Moon analysis is not available yet.'
-            : 'GeoTIFF elevation model (.tif, .tiff), up to 50 MB. Compared with the Gale Crater reference.';
+        if (status === 'idle' || status === 'selected') return;
 
-        // Show the lunar placeholder, never a Mars image.
-        if (ui.moonPlaceholder) {
-            ui.moonPlaceholder.hidden = !isMoon;
+        clearNotice();
+        resetEarthPanel();
+        state.retryable = true;
+
+        if (state.selectedEarthFile) {
+            setChip('ready', 'Selected · ready to analyze');
+            ui.earthStatus.textContent = 'Selected, not yet validated';
+            state.analysisStatus = 'selected';
+        } else {
+            setChip();
+            ui.earthStatus.textContent = 'Awaiting upload';
+            state.analysisStatus = 'idle';
         }
 
-        if (ui.marsPreview) {
-            ui.marsPreview.hidden = isMoon || !ui.marsPreview.getAttribute('src');
+        if (wasBusy) {
+            announce('Analysis cancelled because the reference changed.');
+        }
+    }
+
+    function formatCenter(center) {
+        const lat = Number(center?.latitude_planetocentric);
+        let lon = Number(center?.longitude_positive_east);
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return '—';
+
+        lon = ((lon + 180) % 360 + 360) % 360 - 180;
+
+        return `${Math.abs(lat).toFixed(2)}° ${lat < 0 ? 'S' : 'N'} · ` +
+            `${Math.abs(lon).toFixed(2)}° ${lon < 0 ? 'W' : 'E'}`;
+    }
+
+    function formatSpacing(spacing) {
+        if (!Array.isArray(spacing) || !spacing.length) return '—';
+
+        const [x, y = x] = spacing.map(Number);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return '—';
+
+        return Math.abs(x - y) / Math.max(x, y) < 0.01
+            ? `${Math.round(x)} m`
+            : `${Math.round(x)} × ${Math.round(y)} m`;
+    }
+
+    const titleCase = (text) =>
+        String(text || '').replace(/(^|[\s-])\p{L}/gu, (m) => m.toUpperCase());
+
+    function renderReferenceList() {
+        const planet = state.activePlanet;
+        const label = planetLabel(planet);
+        const refs = referencesFor(planet);
+
+        ui.refStatus.hidden = true;
+        ui.refRetryBtn.hidden = true;
+
+        if (state.referencesStatus === 'loading') {
+            ui.refPickerMeta.textContent = `Loading ${label} references…`;
+            ui.refList.replaceChildren(...[0, 1].map(() => {
+                const ghost = document.createElement('span');
+                ghost.className = 'ref-card ref-card--ghost';
+                ghost.setAttribute('aria-hidden', 'true');
+                return ghost;
+            }));
+            ui.refList.setAttribute('aria-busy', 'true');
+            return;
         }
 
-        if (ui.marsPlaceholder) {
-            ui.marsPlaceholder.hidden = isMoon || Boolean(
-                ui.marsPreview?.getAttribute('src')
-            );
+        ui.refList.removeAttribute('aria-busy');
+
+        if (state.referencesStatus === 'error') {
+            ui.refPickerMeta.textContent = 'Unavailable';
+            ui.refList.replaceChildren();
+            ui.refStatusText.textContent =
+                'References could not be loaded from the analysis engine.';
+            ui.refRetryBtn.hidden = false;
+            ui.refStatus.hidden = false;
+            return;
         }
 
-        // Mars-only metadata should not be presented as lunar information.
-        if (ui.marsCoords) ui.marsCoords.hidden = isMoon;
-        if (ui.marsFacts) ui.marsFacts.hidden = isMoon;
+        ui.refPickerMeta.textContent = refs.length
+            ? `${refs.length} ${label} ${refs.length === 1 ? 'reference' : 'references'}`
+            : `No ${label} references`;
 
-        if (ui.marsFigureCaption) {
-            ui.marsFigureCaption.textContent = isMoon
-                ? 'Lunar reference preview · visual placeholder only'
-                : originalMarsCaption;
+        if (!refs.length) {
+            ui.refList.replaceChildren();
+            ui.refStatusText.textContent =
+                `The analysis engine has no ${label} reference available right now.`;
+            ui.refStatus.hidden = false;
+            return;
         }
 
-        // Hide Mars analysis results while the Moon is selected.
-        if (ui.results) {
-            ui.results.hidden = isMoon || state.phase !== 'success';
+        ui.refList.replaceChildren(...refs.map((ref) => {
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'ref-card';
+            card.dataset.id = ref.id;
+            card.setAttribute('role', 'radio');
+            card.setAttribute('aria-checked', 'false');
+            card.tabIndex = -1;
+
+            const thumb = document.createElement('span');
+            thumb.className = 'ref-card__thumb';
+
+            try {
+                const img = document.createElement('img');
+                img.alt = '';
+                img.loading = 'lazy';
+                img.decoding = 'async';
+                img.src = previewURL(ref.preview_url);
+                img.addEventListener('load', () => thumb.classList.add('is-loaded'));
+                img.addEventListener('error', () => img.remove());
+                thumb.append(img);
+            } catch {
+                // An unusable preview URL leaves the neutral thumbnail in place.
+            }
+
+            const text = document.createElement('span');
+            text.className = 'ref-card__text';
+
+            const name = document.createElement('span');
+            name.className = 'ref-card__name';
+            name.textContent = ref.name;
+            text.append(name);
+
+            if (ref.category) {
+                const category = document.createElement('span');
+                category.className = 'ref-card__category';
+                category.textContent = titleCase(ref.category);
+                text.append(category);
+            }
+
+            if (ref.description) {
+                const desc = document.createElement('span');
+                desc.className = 'ref-card__desc';
+                desc.textContent = ref.description;
+                text.append(desc);
+            }
+
+            const check = document.createElement('span');
+            check.className = 'ref-card__check';
+            check.setAttribute('aria-hidden', 'true');
+
+            card.append(thumb, text, check);
+            return card;
+        }));
+
+        updateReferenceCards(false);
+    }
+
+    function updateReferenceCards(focus) {
+        const cards = [...ui.refList.querySelectorAll('.ref-card[data-id]')];
+        let selected = null;
+
+        for (const card of cards) {
+            const on = card.dataset.id === state.selectedReferenceId;
+            card.setAttribute('aria-checked', String(on));
+            card.classList.toggle('is-selected', on);
+            card.tabIndex = on ? 0 : -1;
+            if (on) selected = card;
         }
 
-        // Keep the backend Mars-only. Never analyze while Moon mode is active.
-        setPhase(state.phase);
+        // Keep the group reachable with Tab even if nothing is selected.
+        if (!selected && cards[0]) cards[0].tabIndex = 0;
+        if (focus && selected) selected.focus();
+    }
+
+    ui.refList.addEventListener('click', (event) => {
+        const card = event.target.closest('.ref-card[data-id]');
+        if (card) selectReference(card.dataset.id);
+    });
+
+    // Radio-group keyboard model: arrows move and select, Home/End jump.
+    ui.refList.addEventListener('keydown', (event) => {
+        const cards = [...ui.refList.querySelectorAll('.ref-card[data-id]')];
+        const index = cards.indexOf(document.activeElement);
+        if (index < 0) return;
+
+        const step = {
+            ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1,
+        }[event.key];
+
+        let target = null;
+        if (step) target = cards[(index + step + cards.length) % cards.length];
+        else if (event.key === 'Home') target = cards[0];
+        else if (event.key === 'End') target = cards[cards.length - 1];
+
+        if (!target) return;
+
+        event.preventDefault();
+        selectReference(target.dataset.id, { focus: true });
+        target.focus();
+    });
+
+    ui.refRetryBtn.addEventListener('click', () => loadReferences());
+
+    // Left panel: the selected planetary reference.
+    function renderReferencePanel(ref) {
+        const label = planetLabel(ref ? ref.body : state.activePlanet);
+        const isMoon = state.activePlanet === 'moon';
+
+        ui.planetTagLabel.textContent = `${label} reference`;
+        ui.marsExpand.hidden = true;
+
+        if (!ref) {
+            ui.marsPreview.hidden = true;
+            ui.marsPreview.removeAttribute('src');
+            ui.marsPreview.classList.remove('is-loaded');
+            ui.marsCoords.hidden = true;
+            ui.marsFacts.hidden = true;
+
+            const loading = state.referencesStatus === 'loading';
+            const showMoonArt = isMoon && !loading;
+
+            ui.moonPlaceholder.hidden = !showMoonArt;
+            ui.marsPlaceholder.hidden = showMoonArt;
+            ui.marsPlaceholder.querySelector('.skeleton').hidden = !loading;
+
+            ui.marsTitle.textContent = loading ? 'Loading reference…' : `No ${label} reference`;
+            ui.marsPlaceholderText.textContent = loading
+                ? 'Loading reference preview…'
+                : state.referencesStatus === 'error'
+                    ? 'Reference preview unavailable: the analysis engine is not reachable.'
+                    : `No ${label} reference is available from the analysis engine.`;
+            ui.marsFigureCaption.textContent = 'No reference selected';
+            return;
+        }
+
+        ui.moonPlaceholder.hidden = true;
+        ui.marsCoords.hidden = false;
+        ui.marsFacts.hidden = false;
+
+        ui.marsTitle.textContent = ref.name;
+        ui.marsCoords.textContent = formatCenter(ref.center);
+        ui.marsDataset.textContent = ref.dataset || '—';
+        ui.marsGridSpacing.textContent = formatSpacing(ref.grid_spacing_m);
+        ui.marsEffective.textContent = describeEffective(ref.effective_resolution_m ?? null);
+        ui.marsFigureCaption.textContent = 'Full reference crop · DEM-derived preview';
+        ui.marsPreview.alt =
+            `Elevation preview of the ${ref.name} reference on ${label}` +
+            (ref.dataset ? ` (${ref.dataset})` : '');
+
+        let src;
+        try {
+            src = previewURL(ref.preview_url);
+        } catch {
+            src = null;
+        }
+
+        if (!src) {
+            ui.marsPreview.hidden = true;
+            ui.marsPlaceholder.hidden = false;
+            ui.marsPlaceholder.querySelector('.skeleton').hidden = true;
+            ui.marsPlaceholderText.textContent = 'This reference has no usable preview image.';
+            return;
+        }
+
+        if (ui.marsPreview.getAttribute('src') === src && ui.marsPreview.classList.contains('is-loaded')) {
+            ui.marsPreview.hidden = false;
+            ui.marsPlaceholder.hidden = true;
+            ui.marsExpand.hidden = false;
+            return;
+        }
+
+        // Show the skeleton until the new preview has loaded.
+        ui.marsPlaceholder.hidden = false;
+        ui.marsPlaceholder.querySelector('.skeleton').hidden = false;
+        ui.marsPlaceholderText.textContent = 'Loading reference preview…';
+        showImage(ui.marsPreview, src, ui.marsPlaceholder);
+    }
+
+    function updateHeroCopy(ref) {
+        const label = planetLabel(state.activePlanet);
+
+        ui.eyebrowLabel.textContent = ref
+            ? `${ref.name} · ${label} reference`
+            : `${label} terrain references`;
+
+        ui.fileHint.textContent =
+            'GeoTIFF elevation model (.tif, .tiff), up to 50 MB. ' +
+            'Elevations are read as metres unless the file declares its units.' +
+            (ref ? ` Compared with the ${ref.name} reference.` : '');
     }
 
     if (ui.planetToggleBtn) {
         ui.planetToggleBtn.addEventListener('click', () => {
-            setPlanet(state.visualPlanet === 'mars' ? 'moon' : 'mars');
+            setPlanet(PLANETS[state.activePlanet].other);
         });
     }
 
     // ---- Phase machine -----------------------------------------------------------------
 
     function setPhase(phase) {
-        state.phase = phase;
+        state.analysisStatus = phase;
         ui.body.dataset.phase = phase;
 
         const busy = phase === 'analyzing';
-        const hasFile = Boolean(state.file);
+        const hasFile = Boolean(state.selectedEarthFile);
+        const hasReference = Boolean(state.selectedReferenceId);
         const fileRejected = phase === 'error' && !state.retryable;
-        const isMoon = state.visualPlanet === 'moon';
-
-        // Prevent changing comparison targets during an active analysis.
-        if (ui.planetToggleBtn) {
-            ui.planetToggleBtn.disabled = busy;
-        }
 
         const uploadPrimary = phase === 'idle' || phase === 'success' || fileRejected;
         setButtonStyle(ui.uploadBtn, uploadPrimary);
@@ -275,19 +640,18 @@
         const analyzePrimary =
             phase === 'selected' || (phase === 'error' && state.retryable) || busy;
 
-        setButtonStyle(ui.analyzeBtn, analyzePrimary && hasFile && !isMoon);
+        setButtonStyle(ui.analyzeBtn, analyzePrimary && hasFile && hasReference);
 
         ui.analyzeBtn.disabled =
-            busy || !hasFile || phase === 'success' || isMoon;
+            busy || !hasFile || !hasReference || phase === 'success';
 
         ui.analyzeBtn.classList.toggle('is-busy', busy);
         ui.analyzeBtn.setAttribute('aria-busy', String(busy));
 
         ui.analyzeLabel.textContent =
-            isMoon ? 'Moon analysis coming soon'
-                : busy ? 'Analyzing…'
-                    : phase === 'error' && hasFile ? 'Try again'
-                        : 'Analyze Terrain';
+            busy ? 'Analyzing…'
+                : phase === 'error' && hasFile ? 'Try again'
+                    : 'Analyze Terrain';
 
         ui.newAnalysisBtn.disabled = busy;
     }
@@ -312,16 +676,16 @@
     };
 
     function setChip(stateName, label) {
-        if (!state.file) {
+        if (!state.selectedEarthFile) {
             ui.fileChip.hidden = true;
             return;
         }
 
         ui.fileChip.hidden = false;
         ui.fileChip.dataset.state = stateName;
-        ui.fileName.textContent = state.file.name;
-        ui.fileName.title = state.file.name;
-        ui.fileSize.textContent = formatBytes(state.file.size);
+        ui.fileName.textContent = state.selectedEarthFile.name;
+        ui.fileName.title = state.selectedEarthFile.name;
+        ui.fileSize.textContent = formatBytes(state.selectedEarthFile.size);
         ui.fileState.textContent = label;
     }
 
@@ -331,11 +695,6 @@
             status === 'online' ? 'Analysis engine online'
                 : status === 'offline' ? 'Analysis engine offline'
                     : 'Checking analysis engine…';
-    }
-
-    function hideUnitChoice() {
-        ui.unitChoice.hidden = true;
-        ui.verticalUnit.value = '';
     }
 
     // ---- Earth panel -------------------------------------------------------------------
@@ -353,10 +712,10 @@
         ui.earthCaption.textContent =
             'Preview of the compared window appears after analysis';
 
-        if (state.file) {
-            ui.earthTitle.textContent = state.file.name;
-            ui.earthFile.textContent = state.file.name;
-            ui.earthSize.textContent = formatBytes(state.file.size);
+        if (state.selectedEarthFile) {
+            ui.earthTitle.textContent = state.selectedEarthFile.name;
+            ui.earthFile.textContent = state.selectedEarthFile.name;
+            ui.earthSize.textContent = formatBytes(state.selectedEarthFile.size);
             $('earthEmptyTitle').textContent = 'Ready when you are';
             $('earthEmptyText').textContent =
                 'Press Analyze Terrain. The shaded relief of the compared window appears here.';
@@ -389,6 +748,11 @@
         ui.mockBadge.hidden = true;
         ui.limitations.open = false;
 
+        ui.sciNotes.hidden = true;
+        ui.sciNotes.open = false;
+        ui.sciNotesList.replaceChildren();
+        ui.sciNotesCount.textContent = '0';
+
         ui.extentNote.textContent =
             'Each image is labelled with the ground area it shows. The two previews are not drawn at the same scale.';
     }
@@ -396,24 +760,24 @@
     // ---- File selection ----------------------------------------------------------------
 
     ui.uploadBtn.addEventListener('click', () => {
-        if (state.phase === 'analyzing') return;
+        if (state.analysisStatus === 'analyzing') return;
 
         ui.input.value = '';
         ui.input.click();
     });
 
     ui.input.addEventListener('change', () => {
-        if (state.phase === 'analyzing') return;
+        if (state.analysisStatus === 'analyzing') return;
 
         const file = ui.input.files && ui.input.files[0];
         if (!file) return;
 
+        state.currentAnalysisResult = null;
         clearResults();
         clearNotice();
-        hideUnitChoice();
 
         if (!/\.tiff?$/i.test(file.name)) {
-            state.file = null;
+            state.selectedEarthFile = null;
             resetEarthPanel();
             setChip();
             ui.earthStatus.textContent = 'Awaiting upload';
@@ -427,7 +791,7 @@
         }
 
         if (file.size > MAX_UPLOAD_BYTES) {
-            state.file = null;
+            state.selectedEarthFile = null;
             resetEarthPanel();
             setChip();
             ui.earthStatus.textContent = 'Awaiting upload';
@@ -440,7 +804,7 @@
             return;
         }
 
-        state.file = file;
+        state.selectedEarthFile = file;
         state.retryable = true;
 
         resetEarthPanel();
@@ -465,12 +829,18 @@
         return url.href;
     }
 
-    function validate(data) {
+    // The reference series is `reference` in the universal API; `mars` is the
+    // legacy alias kept by the backend for older clients.
+    const referenceSeries = (chart) =>
+        Array.isArray(chart?.reference) ? chart.reference : chart?.mars;
+
+    function validate(data, expectedReferenceId) {
         const score = (v) =>
             typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
 
         const text = (v) => typeof v === 'string' && v.length > 0;
         const chart = data?.charts?.slope_distribution;
+        const series = referenceSeries(chart);
 
         if (
             data?.status !== 'success' ||
@@ -478,7 +848,7 @@
             !score(data.total_similarity) ||
             !['relative_relief', 'slope_distribution', 'surface_roughness']
                 .every((k) => score(data.scores?.[k])) ||
-            data.reference?.id !== REFERENCE_ID ||
+            data.reference?.id !== expectedReferenceId ||
             !text(data.reference.name) ||
             !text(data.reference.dataset) ||
             !text(data.reference.preview_url) ||
@@ -489,12 +859,12 @@
             chart?.unit !== 'degrees' ||
             !Array.isArray(chart.bin_edges) ||
             !Array.isArray(chart.earth) ||
-            !Array.isArray(chart.mars) ||
+            !Array.isArray(series) ||
             !chart.earth.length ||
             chart.bin_edges.length !== chart.earth.length + 1 ||
-            chart.mars.length !== chart.earth.length ||
+            series.length !== chart.earth.length ||
             !chart.earth.every(score) ||
-            !chart.mars.every(score) ||
+            !series.every(score) ||
             !chart.bin_edges.every((v, i, a) =>
                 Number.isFinite(v) && (i === 0 || v > a[i - 1])) ||
             !Array.isArray(data.warnings) ||
@@ -508,29 +878,65 @@
     }
 
     // ---- Analyze -----------------------------------------------------------------------
+    // The only place that calls POST /analyze. Planet and reference changes never do.
 
-    ui.analyzeBtn.addEventListener('click', async () => {
-        if (
-            state.phase === 'analyzing' ||
-            !state.file ||
-            state.visualPlanet !== 'mars'
-        ) return;
+    async function postAnalyze(file, referenceId, verticalUnit, signal) {
+        const body = new FormData();
+        body.append('file', file);
+        body.append('reference_id', referenceId);
 
-        const needsUnit = !ui.unitChoice.hidden;
-        const selectedUnit = needsUnit ? ui.verticalUnit.value : '';
-
-        if (needsUnit && !selectedUnit) {
-            showNotice(
-                'Choose elevation units',
-                'Select metres or feet before trying the analysis again.'
-            );
-            ui.verticalUnit.focus();
-            return;
+        if (verticalUnit) {
+            body.append('vertical_unit', verticalUnit);
         }
 
-        const file = state.file;
-        const run = ++state.counter;
+        let response;
 
+        try {
+            response = await fetch(new URL('analyze', API_BASE), {
+                method: 'POST',
+                body,
+                signal,
+            });
+        } catch (error) {
+            if (error?.name === 'AbortError') throw error;
+
+            setEngine('offline');
+
+            throw new AnalysisError(
+                `Terra Analog could not reach the analysis engine at ${API_BASE}. Check that the backend is running, then try again.`,
+                'Analysis engine unreachable',
+                'NETWORK'
+            );
+        }
+
+        const data = await response.json().catch(() => null);
+        return { response, data };
+    }
+
+    ui.analyzeBtn.addEventListener('click', () => {
+        runAnalysis();
+    });
+
+    async function runAnalysis() {
+        if (
+            state.analysisStatus === 'analyzing' ||
+            !state.selectedEarthFile ||
+            !state.selectedReferenceId
+        ) return;
+
+        // Snapshot the request identity: file, reference and run id.
+        const file = state.selectedEarthFile;
+        const referenceId = state.selectedReferenceId;
+        const run = ++state.counter;
+        const controller = new AbortController();
+        state.controller = controller;
+
+        const isCurrent = () =>
+            run === state.counter &&
+            referenceId === state.selectedReferenceId &&
+            file === state.selectedEarthFile;
+
+        state.currentAnalysisResult = null;
         clearResults();
         clearNotice();
 
@@ -541,45 +947,41 @@
         ui.earthLoading.hidden = false;
         ui.earthFrame.dataset.state = 'loading';
 
+        // A valid analysis has started: bring both comparison cards (and the
+        // loading state) into view right away, below the sticky header.
+        scrollToComparison();
+
         try {
-            const body = new FormData();
-            body.append('file', file);
-            body.append('reference_id', REFERENCE_ID);
+            // First attempt: no unit, so units declared in the GeoTIFF (metres,
+            // feet, US survey feet) are used as-is by the backend.
+            let unitsAssumed = false;
+            let { response, data } = await postAnalyze(file, referenceId, null, controller.signal);
 
-            if (selectedUnit) {
-                body.append('vertical_unit', selectedUnit);
+            // Only when the file declares no units: fall back to the metres default.
+            if (
+                isCurrent() &&
+                !response.ok &&
+                data?.error?.code === 'UNKNOWN_VERTICAL_UNITS'
+            ) {
+                unitsAssumed = true;
+                ({ response, data } = await postAnalyze(
+                    file, referenceId, DEFAULT_VERTICAL_UNIT, controller.signal
+                ));
             }
 
-            let response;
-
-            try {
-                response = await fetch(new URL('analyze', API_BASE), {
-                    method: 'POST',
-                    body,
-                });
-            } catch {
-                setEngine('offline');
-
-                throw new AnalysisError(
-                    `Terra Analog could not reach the analysis engine at ${API_BASE}. Check that the backend is running, then try again.`,
-                    'Analysis engine unreachable',
-                    'NETWORK'
-                );
-            }
+            if (!isCurrent()) return;
 
             setEngine('online');
-
-            const data = await response.json().catch(() => null);
 
             if (!response.ok || data?.status === 'error') {
                 const errorCode = data?.error?.code || '';
 
-                if (errorCode === 'UNKNOWN_VERTICAL_UNITS') {
+                if (errorCode === 'UNKNOWN_REFERENCE' || errorCode === 'REFERENCE_UNAVAILABLE') {
                     throw new AnalysisError(
-                        data?.error?.message ||
-                        'The GeoTIFF does not declare its elevation units. Choose metres or feet to continue.',
-                        'Elevation units required',
-                        'UNKNOWN_VERTICAL_UNITS',
+                        (data?.error?.message || 'The selected reference is not available.') +
+                        ' The reference list has been refreshed; choose a reference and try again.',
+                        'Reference unavailable',
+                        errorCode,
                         true
                     );
                 }
@@ -604,44 +1006,38 @@
                 );
             }
 
-            validate(data);
+            validate(data, referenceId);
 
-            if (run !== state.counter) return;
+            // Never let an old response overwrite a newer selection.
+            if (!isCurrent()) return;
 
-            hideUnitChoice();
-            render(data, file);
+            state.currentAnalysisResult = data;
+            render(data, file, { unitsAssumed });
             setPhase('success');
 
         } catch (error) {
-            if (run !== state.counter) return;
+            if (error?.name === 'AbortError' || !isCurrent()) return;
 
             const err = error instanceof AnalysisError
                 ? error
                 : new AnalysisError(String(error?.message || error));
 
+            state.currentAnalysisResult = null;
             clearResults();
             resetEarthPanel();
 
             state.retryable = err.retryable;
 
-            if (err.code === 'UNKNOWN_VERTICAL_UNITS') {
-                ui.unitChoice.hidden = false;
-                ui.earthStatus.textContent = 'Units required';
+            const referenceProblem =
+                err.code === 'UNKNOWN_REFERENCE' || err.code === 'REFERENCE_UNAVAILABLE';
 
-                setChip('ready', 'Elevation units required');
-                setPhase('error');
-
-                showNotice(
-                    'Elevation units required',
-                    err.message
-                );
-
-                scrollToEl(ui.unitChoice);
-                return;
+            if (referenceProblem) {
+                setChip('ready', 'Selected · ready to analyze');
+                ui.earthStatus.textContent = 'Selected, not yet validated';
+            } else {
+                setChip('failed', 'Analysis failed');
+                ui.earthStatus.textContent = 'Not analyzed';
             }
-
-            setChip('failed', 'Analysis failed');
-            ui.earthStatus.textContent = 'Not analyzed';
 
             setPhase('error');
 
@@ -652,14 +1048,30 @@
                     ? ` (${err.code})`
                     : '')
             );
-        }
-    });
 
-    ui.verticalUnit.addEventListener('change', () => {
-        if (ui.verticalUnit.value) {
-            clearNotice();
+            // The view moved to the comparison cards when the analysis started;
+            // bring the error (and its Try again control) back into view.
+            ui.notice.scrollIntoView({
+                behavior: reducedMotion.matches ? 'auto' : 'smooth',
+                block: 'center',
+            });
+
+            if (referenceProblem) {
+                const notice = [err.title, ui.noticeMessage.textContent];
+
+                // Refresh the catalogue; re-show the notice if the refresh
+                // replaced the selection (which clears stale notices).
+                loadReferences().then(() => {
+                    if (state.analysisStatus !== 'analyzing' && ui.notice.hidden) {
+                        showNotice(...notice);
+                    }
+                });
+            }
+
+        } finally {
+            if (state.controller === controller) state.controller = null;
         }
-    });
+    }
 
     // ---- Rendering ---------------------------------------------------------------------
 
@@ -682,28 +1094,41 @@
             : { message };
     }
 
-    function render(data, file) {
+    function render(data, file, { unitsAssumed = false } = {}) {
+        const ref = data.reference;
+        const label = planetLabel(String(ref.body || state.activePlanet).toLowerCase());
         const earthURL = previewURL(data.earth_preview_url);
-        const marsURL = previewURL(data.reference.preview_url);
+        const refURL = previewURL(ref.preview_url);
         const scale = parseComparisonScale(data.warnings);
+
+        // Backend warnings are shown as returned; the frontend only adds a
+        // clearly labelled note when it applied the metres default itself.
+        const warnings = unitsAssumed
+            ? [...data.warnings, {
+                code: 'VERTICAL_UNITS_ASSUMED',
+                message: 'This GeoTIFF does not declare its elevation units, so its values were read as metres (the default). If the file actually stores feet, these results are not valid.',
+            }]
+            : data.warnings;
 
         showImage(ui.earthPreview, earthURL, ui.earthEmpty);
         ui.earthLoading.hidden = true;
         ui.earthFrame.dataset.state = 'loaded';
 
-        if (ui.marsPreview.getAttribute('src') !== marsURL) {
-            showImage(ui.marsPreview, marsURL, ui.marsPlaceholder);
+        if (ui.marsPreview.getAttribute('src') !== refURL) {
+            showImage(ui.marsPreview, refURL, ui.marsPlaceholder);
         }
 
-        ui.marsTitle.textContent = data.reference.name;
-        ui.marsDataset.textContent = data.reference.dataset;
+        ui.marsTitle.textContent = ref.name;
+        ui.marsDataset.textContent = ref.dataset;
         ui.marsEffective.textContent =
-            describeEffective(data.reference.effective_resolution_m);
+            describeEffective(ref.effective_resolution_m);
 
         ui.earthTitle.textContent = file.name;
-        ui.earthStatus.textContent = 'Analyzed';
+        ui.earthStatus.textContent = unitsAssumed
+            ? 'Analyzed · units assumed metres'
+            : 'Analyzed';
 
-        setChip('analyzed', 'Analyzed');
+        setChip('analyzed', unitsAssumed ? 'Analyzed · metres assumed' : 'Analyzed');
 
         ui.earthCaption.innerHTML = '';
         ui.earthCaption.append('Compared window · ');
@@ -717,14 +1142,13 @@
         ui.earthCaption.append(extent, ' across');
 
         ui.extentNote.textContent = scale.widthKm
-            ? (scale.widthKm < MARS_PREVIEW_EXTENT_KM * 0.95
-                ? `Not to the same scale: the Mars image shows the full ≈${MARS_PREVIEW_EXTENT_KM} km reference crop, while the Earth image shows the ${scale.widthKm} km window that was compared. Only the central ${scale.widthKm} km of the Mars crop entered the comparison.`
-                : `Both images cover roughly the compared ${scale.widthKm} km window. The Mars image also includes plot axes and a colour scale.`)
+            ? `Not necessarily to the same scale: the ${label} image shows the full ${ref.name} reference crop, while the Earth image shows the ${scale.widthKm} km window that was compared. Only the central ${scale.widthKm} km of each DEM entered the comparison.`
             : 'Each image is labelled with the ground area it shows. The two previews are not drawn at the same scale.';
 
         ui.mockBadge.hidden = !data.is_mock;
+        ui.cmpReferenceLabel.textContent = `${label} reference`;
         ui.cmpReference.textContent =
-            `${data.reference.name} · ${data.reference.dataset}`;
+            `${ref.name} · ${ref.dataset}`;
         ui.cmpEarth.textContent = file.name;
 
         ui.cmpWindow.textContent = scale.widthKm
@@ -735,7 +1159,10 @@
             ? `${scale.resolutionM} m · ${scale.cells} × ${scale.cells} cells`
             : '—';
 
-        ui.legendMars.textContent = `Mars · ${data.reference.name}`;
+        ui.legendMars.textContent = `${label} · ${ref.name}`;
+        ui.tableRefHead.textContent = label;
+        ui.referenceSource.textContent =
+            `Earth data is the uploaded DEM; ${label} data is ${ref.dataset}.`;
 
         const total = data.total_similarity;
 
@@ -753,10 +1180,16 @@
             $(key + 'Marker').style.setProperty('--pos', '0%');
         }
 
-        state.chartData = data.charts.slope_distribution;
+        const dist = data.charts.slope_distribution;
+        state.chartLabel = label;
+        state.chartData = {
+            bin_edges: dist.bin_edges,
+            earth: dist.earth,
+            reference: referenceSeries(dist),
+        };
         renderTable(state.chartData);
 
-        ui.warnings.replaceChildren(...data.warnings.map((w) => {
+        ui.warnings.replaceChildren(...warnings.map((w) => {
             const li = document.createElement('li');
             li.className = 'warning';
 
@@ -781,12 +1214,13 @@
             return li;
         }));
 
-        ui.warningCount.textContent = String(data.warnings.length);
+        ui.warningCount.textContent = String(warnings.length);
+        renderScientificNotes(warnings);
 
         ui.referenceMetadata.textContent =
-            `Reference: ${data.reference.name}, ${data.reference.dataset}. Effective resolution: ${describeEffective(data.reference.effective_resolution_m)}.`;
+            `Reference: ${ref.name} (${label}), ${ref.dataset}. Effective resolution: ${describeEffective(ref.effective_resolution_m)}.`;
 
-        ui.results.hidden = state.visualPlanet === 'moon';
+        ui.results.hidden = false;
 
         ui.results.querySelectorAll('.reveal').forEach((n) => {
             n.style.animation = 'none';
@@ -811,11 +1245,52 @@
         });
 
         countUp(ui.score, total * 100);
-        scrollToEl($('compare'));
+        // No scroll here: the view moved to the comparison cards when the
+        // analysis started, and must not jump again when the response arrives.
 
         announce(
             `Analysis complete. Terrain similarity ${index100(total)} out of 100.`
         );
+    }
+
+    // Messages are shown verbatim under each note, so backend meaning is preserved.
+    // The complete warning list remains under "Methodology & limitations".
+    function renderScientificNotes(warnings) {
+        const items = [];
+
+        for (const note of SCIENTIFIC_NOTES) {
+            const matches = warnings.filter((w) => note.codes.includes(w.code));
+            if (!matches.length) continue;
+
+            const li = document.createElement('li');
+            li.className = 'sci-notes__item';
+            li.dataset.kind = note.kind;
+
+            const title = document.createElement('p');
+            title.className = 'sci-notes__title';
+            title.textContent = note.title;
+            li.append(title);
+
+            for (const w of matches) {
+                const detail = document.createElement('p');
+                detail.className = 'sci-notes__detail';
+                detail.textContent = w.message;
+
+                const code = document.createElement('span');
+                code.className = 'sci-notes__code';
+                code.textContent = w.code;
+                detail.append(code);
+
+                li.append(detail);
+            }
+
+            items.push(li);
+        }
+
+        ui.sciNotesList.replaceChildren(...items);
+        ui.sciNotesCount.textContent = String(items.length);
+        ui.sciNotes.hidden = items.length === 0;
+        ui.sciNotes.open = false;
     }
 
     function describeEffective(value) {
@@ -841,13 +1316,11 @@
 
             img.hidden = true;
 
-            // Never reveal the Mars placeholder over the Moon preview.
-            if (img === ui.marsPreview && state.visualPlanet === 'moon') {
-                return;
-            }
-
             if (placeholder) {
                 placeholder.hidden = false;
+
+                const skeleton = placeholder.querySelector('.skeleton');
+                if (skeleton) skeleton.hidden = true;
 
                 const note = placeholder.querySelector(
                     '.frame__note, .empty__text'
@@ -910,7 +1383,7 @@
 
             for (const [j, value] of [
                 binLabel(dist.bin_edges, i),
-                pct(dist.mars[i]),
+                pct(dist.reference[i]),
                 pct(dist.earth[i]),
             ].entries()) {
                 const cell = document.createElement(j === 0 ? 'th' : 'td');
@@ -968,7 +1441,7 @@
         const height = plotH + m.t + m.b;
 
         const { max: maxY, ticks } =
-            niceScale(Math.max(...dist.earth, ...dist.mars));
+            niceScale(Math.max(...dist.earth, ...dist.reference));
 
         const y = (v) => m.t + plotH - (v / maxY) * plotH;
         const group = plotW / n;
@@ -1017,14 +1490,14 @@
             }));
 
             const cx = gx + group / 2;
-            const marsH = Math.max(0, y(0) - y(dist.mars[i]));
+            const marsH = Math.max(0, y(0) - y(dist.reference[i]));
             const earthH = Math.max(0, y(0) - y(dist.earth[i]));
 
             if (marsH > 0) {
                 g.append(svgEl('rect', {
                     class: 'bar bar-mars',
                     x: cx - bw - 1.5,
-                    y: y(dist.mars[i]),
+                    y: y(dist.reference[i]),
                     width: bw,
                     height: marsH,
                     rx: 3,
@@ -1060,7 +1533,7 @@
                 g,
                 i,
                 cx,
-                y(Math.max(dist.mars[i], dist.earth[i]))
+                y(Math.max(dist.reference[i], dist.earth[i]))
             );
 
             svg.append(g);
@@ -1086,7 +1559,7 @@
         const height = m.t + m.b + n * row;
         const plotW = width - m.l - m.r;
 
-        const maxX = niceMax(Math.max(...dist.earth, ...dist.mars));
+        const maxX = niceMax(Math.max(...dist.earth, ...dist.reference));
         const x = (v) => m.l + (v / maxX) * plotW;
         const bh = 10;
 
@@ -1128,14 +1601,15 @@
             label.textContent = binLabel(dist.bin_edges, i);
             g.append(label);
 
-            [['mars', top + row / 2 - bh - 1],
-                ['earth', top + row / 2 + 1]].forEach(([series, by]) => {
+            // CSS classes keep the established `bar-mars` colour for the reference series.
+            [['reference', 'mars', top + row / 2 - bh - 1],
+                ['earth', 'earth', top + row / 2 + 1]].forEach(([series, cls, by]) => {
                 const v = dist[series][i];
                 const w = Math.max(0, x(v) - m.l);
 
                 if (w > 0) {
                     g.append(svgEl('rect', {
-                        class: `bar bar--h bar-${series}`,
+                        class: `bar bar--h bar-${cls}`,
                         x: m.l,
                         y: by,
                         width: w,
@@ -1160,7 +1634,7 @@
                 i,
                 Math.min(
                     width - 90,
-                    x(Math.max(dist.mars[i], dist.earth[i])) + 40
+                    x(Math.max(dist.reference[i], dist.earth[i])) + 40
                 ),
                 top
             );
@@ -1183,7 +1657,7 @@
             ui.tooltip.append(head);
 
             for (const [name, color, value] of [
-                ['Mars', 'var(--mars)', dist.mars[i]],
+                [state.chartLabel, 'var(--mars)', dist.reference[i]],
                 ['Earth', 'var(--earth)', dist.earth[i]],
             ]) {
                 const row = document.createElement('div');
@@ -1231,9 +1705,10 @@
     // ---- New analysis, dialogs, lightbox -----------------------------------------------
 
     ui.newAnalysisBtn.addEventListener('click', () => {
-        if (state.phase === 'analyzing') return;
+        if (state.analysisStatus === 'analyzing') return;
 
-        state.file = null;
+        state.selectedEarthFile = null;
+        state.currentAnalysisResult = null;
         state.retryable = true;
         state.counter++;
 
@@ -1241,7 +1716,6 @@
 
         clearResults();
         clearNotice();
-        hideUnitChoice();
         resetEarthPanel();
 
         setChip();
@@ -1261,17 +1735,18 @@
             const img = $(button.dataset.expand);
             if (!img || !img.getAttribute('src')) return;
 
-            const isMars = img === ui.marsPreview;
+            const isReference = img === ui.marsPreview;
+            const ref = referenceById(state.selectedReferenceId);
 
-            ui.lightboxTitle.textContent = isMars
-                ? `Mars reference · ${ui.marsTitle.textContent}`
+            ui.lightboxTitle.textContent = isReference
+                ? `${ui.planetTagLabel.textContent} · ${ui.marsTitle.textContent}`
                 : `Earth terrain · ${ui.earthTitle.textContent}`;
 
             ui.lightboxImg.src = img.src;
             ui.lightboxImg.alt = img.alt;
 
-            ui.lightboxCaption.textContent = isMars
-                ? `Full reference crop, ≈${MARS_PREVIEW_EXTENT_KM} km across. Prepared NASA MOLA elevation preview.`
+            ui.lightboxCaption.textContent = isReference
+                ? `Full reference crop. DEM-derived elevation preview${ref?.dataset ? ` from ${ref.dataset}` : ''}.`
                 : `${ui.earthCaption.textContent}. Shaded relief rendered by the analysis engine from the uploaded DEM.`;
 
             ui.lightbox.showModal();
@@ -1284,73 +1759,194 @@
         });
     }
 
-    // ---- Start-up: engine status + Mars reference ---------------------------------------
+    // ---- Start-up: engine status + reference catalogue ----------------------------------
 
-    async function loadReference() {
+    // Keep only entries that can actually be offered: an id, a name, a preview and
+    // the planetary body they belong to. Unavailable references are never listed
+    // by the backend, so anything returned here is selectable.
+    function normaliseReference(raw) {
+        if (
+            !raw ||
+            typeof raw.id !== 'string' || !raw.id ||
+            typeof raw.name !== 'string' || !raw.name ||
+            typeof raw.preview_url !== 'string' || !raw.preview_url ||
+            typeof raw.body !== 'string' || !raw.body
+        ) return null;
+
+        return {
+            ...raw,
+            body: raw.body.trim().toLowerCase(),
+            category: typeof raw.category === 'string' ? raw.category : '',
+            description: typeof raw.description === 'string' ? raw.description : '',
+        };
+    }
+
+    let referencesRequest = 0;
+
+    async function loadReferences() {
+        const request = ++referencesRequest;
+
+        state.referencesStatus = 'loading';
+        renderReferenceList();
+        if (!state.selectedReferenceId) renderReferencePanel(null);
+
+        fetch(new URL('health', API_BASE))
+            .then((health) => setEngine(health.ok ? 'online' : 'offline'))
+            .catch(() => setEngine('offline'));
+
+        let references = [];
+        let ok = false;
+
         try {
-            const health = await fetch(new URL('health', API_BASE));
-            setEngine(health.ok ? 'online' : 'offline');
-
             const response = await fetch(new URL('references', API_BASE));
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
             const data = await response.json();
+            if (!Array.isArray(data?.references)) throw new Error('invalid payload');
 
-            const ref = Array.isArray(data?.references)
-                ? data.references.find((r) => r?.id === REFERENCE_ID)
-                : null;
-
-            if (!ref || typeof ref.preview_url !== 'string') {
-                throw new Error('reference missing');
-            }
-
-            ui.marsTitle.textContent = ref.name || 'Gale Crater';
-            ui.marsDataset.textContent = ref.dataset || '—';
-            ui.marsEffective.textContent =
-                describeEffective(ref.effective_resolution_m ?? null);
-
-            showImage(
-                ui.marsPreview,
-                previewURL(ref.preview_url),
-                ui.marsPlaceholder
-            );
-
-            // Keep the Mars image hidden if Moon mode is already selected.
-            if (state.visualPlanet === 'moon') {
-                ui.marsPreview.hidden = true;
-                ui.marsPlaceholder.hidden = true;
-            }
-
+            references = data.references.map(normaliseReference).filter(Boolean);
+            ok = true;
         } catch {
             setEngine('offline');
-
-            if (ui.marsPlaceholder) {
-                const skeleton = ui.marsPlaceholder.querySelector('.skeleton');
-                if (skeleton) skeleton.hidden = true;
-
-                if (ui.marsPlaceholderText) {
-                    ui.marsPlaceholderText.textContent =
-                        'Reference preview unavailable: the analysis engine is not reachable.';
-                }
-            }
         }
+
+        if (request !== referencesRequest) return; // a newer load superseded this one
+
+        state.references = references;
+        state.referencesStatus = ok ? 'ready' : 'error';
+
+        // Forget remembered selections that no longer exist.
+        for (const planet of Object.keys(state.lastSelection)) {
+            if (!referenceById(state.lastSelection[planet])) state.lastSelection[planet] = null;
+        }
+
+        // Keep the current selection when still valid; otherwise pick a default.
+        if (referenceById(state.selectedReferenceId)) {
+            state.lastSelection[state.activePlanet] = state.selectedReferenceId;
+        }
+
+        setPlanet(state.activePlanet);
+    }
+
+    // ---- Hero mascot orbit ---------------------------------------------------------------
+    // Moves the existing star mascot along the dashed ellipse drawn in .hero__orbit.
+    // One element, one transform per frame; paused when off-screen or hidden.
+
+    function startOrbit() {
+        const { hero, orbit, companion } = ui;
+        const ellipse = orbit?.querySelector('ellipse');
+        if (!hero || !orbit || !companion || !ellipse) return;
+
+        // Ellipse geometry in SVG user units, read from the markup.
+        const cx = ellipse.cx.baseVal.value;
+        const cy = ellipse.cy.baseVal.value;
+        const rx = ellipse.rx.baseVal.value;
+        const ry = ellipse.ry.baseVal.value;
+        const rotation = /rotate\(\s*(-?[\d.]+)/.exec(ellipse.getAttribute('transform') || '');
+        const theta = ((rotation ? Number(rotation[1]) : 0) * Math.PI) / 180;
+        const viewBox = orbit.viewBox.baseVal;
+
+        const PERIOD_MS = 34000;
+        const START = -2.2; // radians: begins near the mascot's original upper position
+
+        let box = null;          // orbit box relative to the hero
+        let visible = true;
+        let frame = 0;
+        const origin = performance.now();
+
+        companion.classList.add('is-orbiting');
+
+        function measure() {
+            const style = getComputedStyle(companion);
+            const orbitStyle = getComputedStyle(orbit);
+
+            if (style.display === 'none' || orbitStyle.display === 'none') {
+                box = null;
+                return;
+            }
+
+            const h = hero.getBoundingClientRect();
+            const o = orbit.getBoundingClientRect();
+
+            box = {
+                left: o.left - h.left,
+                top: o.top - h.top,
+                // Uniform scale: the viewBox is preserved with "meet".
+                scale: Math.min(o.width / viewBox.width, o.height / viewBox.height),
+                offX: (o.width - viewBox.width * Math.min(o.width / viewBox.width, o.height / viewBox.height)) / 2,
+                offY: (o.height - viewBox.height * Math.min(o.width / viewBox.width, o.height / viewBox.height)) / 2,
+                // SVG elements have no offsetWidth; the CSS width is untransformed.
+                half: (parseFloat(style.width) || 44) / 2,
+            };
+        }
+
+        function place(t) {
+            if (!box) return;
+
+            const ex = rx * Math.cos(t);
+            const ey = ry * Math.sin(t);
+            const x = cx + ex * Math.cos(theta) - ey * Math.sin(theta) - viewBox.x;
+            const y = cy + ex * Math.sin(theta) + ey * Math.cos(theta) - viewBox.y;
+
+            const px = box.left + box.offX + x * box.scale - box.half;
+            const py = box.top + box.offY + y * box.scale - box.half;
+
+            // Gentle tilt and a slight depth cue: a touch larger on the near side.
+            const tilt = Math.sin(t * 2) * 9;
+            const depth = 0.94 + 0.08 * (Math.sin(t) + 1) / 2;
+
+            companion.style.transform =
+                `translate3d(${px.toFixed(2)}px, ${py.toFixed(2)}px, 0) rotate(${tilt.toFixed(2)}deg) scale(${depth.toFixed(3)})`;
+        }
+
+        function tick(now) {
+            frame = 0;
+            if (!visible || !box) return;
+
+            const t = START + ((now - origin) / PERIOD_MS) * Math.PI * 2;
+            place(t);
+            frame = requestAnimationFrame(tick);
+        }
+
+        function update() {
+            cancelAnimationFrame(frame);
+            frame = 0;
+            measure();
+
+            if (reducedMotion.matches) {
+                place(START); // a still mascot resting on the orbit
+                return;
+            }
+
+            if (visible && box) frame = requestAnimationFrame(tick);
+        }
+
+        new ResizeObserver(update).observe(hero);
+        window.addEventListener('resize', update, { passive: true });
+
+        new IntersectionObserver((entries) => {
+            const wasVisible = visible;
+            visible = entries[0].isIntersecting;
+
+            if (visible && !wasVisible) update();
+        }).observe(hero);
+
+        reducedMotion.addEventListener?.('change', update);
+
+        update();
     }
 
     // ---- Start --------------------------------------------------------------------------
 
-    if (!ui.unitChoice || !ui.verticalUnit) {
-        console.error(
-            'Terra Analog: elevation-unit selector elements were not found in index.html.'
-        );
-    }
-
     if (!ui.planetToggleBtn || !ui.planetToggleLabel || !ui.planetName || !ui.moonPlaceholder) {
         console.warn(
-            'Terra Analog: one or more planet-toggle elements are missing from index.html. The Mars experience will still work.'
+            'Terra Analog: one or more planet-toggle elements are missing from index.html.'
         );
     }
 
-    hideUnitChoice();
     setPhase('idle');
     setPlanet('mars');
-    loadReference();
+    loadReferences();
+    startOrbit();
 
 })();
