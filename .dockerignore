@@ -1,0 +1,20 @@
+# Only backend/ and frontend/ are needed at runtime.
+.git
+.github
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+backend/tests
+backend/verification
+backend/synthetic_earth.tif
+mars-2-raw
+mars-source
+raw-moon-data
+data
+docs
+frontend/docs
+*.md
+!backend/README.md
+.env
+.env.*

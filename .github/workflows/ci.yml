@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [frontend--dev, main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    name: Backend tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install dependencies
+        run: pip install --only-binary=:all: -r backend/requirements-dev.txt
+      - name: Validate planetary references (byte-level integrity)
+        run: python backend/check_references.py
+      - name: Run test suite
+        working-directory: backend
+        run: python -m pytest -q -p no:cacheprovider
+
+  docker-smoke:
+    name: Docker build and smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Build image
+        run: docker build -t terra-analog:ci .
+      - name: Start container
+        run: |
+          docker run -d --name terra -p 8000:8000 terra-analog:ci
+          for i in $(seq 60); do curl -fs http://127.0.0.1:8000/health && break; sleep 1; done
+      - name: Create synthetic Earth DEM (test fixture, not observational data)
+        run: |
+          pip install --only-binary=:all: -r backend/requirements.txt
+          cd backend && python -c "import sys; sys.path.insert(0,'tests'); from conftest import *; from pathlib import Path; x,y=utm_grid(1200,50.0); write_dem(Path('/tmp/earth.tif'), synthetic_surface(x,y))"
+      - name: Smoke test all references through HTTP
+        run: python backend/smoke_test.py http://127.0.0.1:8000 /tmp/earth.tif
+      - name: Container logs
+        if: always()
+        run: docker logs terra
