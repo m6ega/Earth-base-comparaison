@@ -243,13 +243,14 @@ def test_gale_is_sampled_pixel_for_pixel(gale, cells):
     assert np.array_equal(grid.valid, np.isfinite(raw[r0 : r0 + cells, c0 : c0 + cells]))
 
 
-def test_gale_full_extent_falls_back_to_averaging(gale):
+def test_gale_full_extent_falls_back_to_interpolation(gale):
     """Documented limitation: over ~99 km the 0.45 % E-W mismatch accumulates to half a pixel,
-    so a clean 1:1 mapping no longer exists and area averaging is used (with a warning in analyze)."""
+    so a clean 1:1 mapping no longer exists. Since methodology 0.4 such near-native grids are
+    bilinearly interpolated (GDAL area averaging at ~1:1 adds artefacts); analyze warns."""
     source, _ = gale
     res = round(source.native_spacing_m, 6)
     cells = int(2 * source.half_extent_m // res)
-    assert harmonize(source, res, cells).sampling == "average"
+    assert harmonize(source, res, cells).sampling == "interpolated"
 
 
 def test_gale_zero_valued_nodata_pixels_lie_on_the_zero_metre_contour(gale):

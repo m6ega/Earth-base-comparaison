@@ -85,7 +85,9 @@ class HarmonizedGrid:
     valid: np.ndarray  # (n, n) bool
     resolution_m: float
     cells: int
-    # "average": area-weighted aggregation of finer source pixels.
+    # "average": GDAL area aggregation (downsampling >= 2x on an aligned grid).
+    # "interpolated": area-weighted box pre-filter over one cell, then bilinear
+    #                 sampling (near-native ratios or rotated grids).
     # "aligned": one source pixel per cell, no interpolation (near-native spacing).
     sampling: str = "average"
     # Aligned sampling only: largest ground distance (m) between a cell centre
@@ -294,7 +296,93 @@ def _check_plausible(data: np.ndarray, body: str, verified_range=None) -> None:
         )
 
 
-def _resample(data, src_transform, src_crs, dst_transform, dst_crs, cells):
+def grid_rotation_deg(source: DemSource, win_transform, shape) -> float:
+    """Angle (0-45 degrees) between the raster's pixel axes and the local east/north frame.
+
+    Multiples of 90 degrees count as aligned. Polar stereographic references are
+    strongly rotated (e.g. ~130 degrees at Shackleton), while geographic and UTM
+    Earth rasters are within a few degrees (meridian convergence).
+    """
+    local = pyproj.CRS.from_wkt(source.local_crs_wkt)
+    to_local = _transformer(source.horizontal_crs, local)
+    col, row = shape[1] / 2.0, shape[0] / 2.0
+    (x0, y0), (x1, y1) = _apply(win_transform, col, row), _apply(win_transform, col + 1, row)
+    lx, ly = to_local.transform([x0, x1], [y0, y1])
+    angle = math.degrees(math.atan2(ly[1] - ly[0], lx[1] - lx[0])) % 90.0
+    return min(angle, 90.0 - angle)
+
+
+def area_average_applicable(source: DemSource, resolution_m: float, rotation_deg: float) -> bool:
+    """GDAL area averaging is used only where it behaves as a true area average.
+
+    It requires genuine downsampling (each cell covers at least
+    AREA_AVERAGE_MIN_RATIO source pixels per axis) on a grid aligned with the
+    local frame. At ratios near 1:1, or on rotated grids, GDAL's average mixes a
+    varying number of source pixels per cell and adds cell-to-cell artefacts
+    (methodology 0.4 audit: Shackleton 3x3 roughness 1.30 m native -> 4.65 m).
+    """
+    ratio = resolution_m / min(source.spacing_xy_m)
+    return ratio >= settings.AREA_AVERAGE_MIN_RATIO and rotation_deg <= settings.AREA_AVERAGE_MAX_ROTATION_DEG
+
+
+def _box_weights(width: float) -> np.ndarray:
+    """1-D area weights of a box `width` source pixels wide centred on a pixel."""
+    h = width / 2.0
+    n = int(math.ceil(h - 0.5))
+    i = np.arange(-n, n + 1, dtype=np.float64)
+    w = np.clip(np.minimum(i + 0.5, h) - np.maximum(i - 0.5, -h), 0.0, None)
+    return w / w.sum()
+
+
+def _interpolate_area_mean(data, win_transform, source: DemSource, resolution_m: float, cells: int):
+    """Area mean over one target cell, sampled exactly at the local-grid cell centres.
+
+    1. Normalized box filter on the source grid: the box spans one target cell
+       (resolution / spacing source pixels per axis, exact fractional area
+       weights). Valid-pixel values and the valid-area weight are filtered
+       separately, so NoData never enters an elevation. At ratios <= 1 the box is
+       a single pixel (no smoothing).
+    2. Point bilinear sampling of both at the cell centres (scipy, not GDAL: GDAL
+       widens its bilinear kernel when downsampling, which would smooth twice).
+    3. Elevation = filtered values / filtered weight; a cell is valid only if
+       valid source pixels cover at least MIN_CELL_COVERAGE of it.
+    """
+    from scipy import ndimage
+
+    valid = np.isfinite(data)
+    values = np.where(valid, data, 0.0)
+    weight = valid.astype(np.float64)
+    dx, dy = source.spacing_xy_m
+    width_cols, width_rows = resolution_m / dx, resolution_m / dy
+    if width_cols > 1.0 or width_rows > 1.0:
+        wc, wr = _box_weights(max(width_cols, 1.0)), _box_weights(max(width_rows, 1.0))
+
+        def smooth(a):
+            return ndimage.convolve1d(ndimage.convolve1d(a, wr, axis=0, mode="constant"), wc, axis=1, mode="constant")
+
+        values, weight = smooth(values), smooth(weight)
+
+    local = pyproj.CRS.from_wkt(source.local_crs_wkt)
+    to_src = _transformer(local, source.horizontal_crs)
+    half = resolution_m * cells / 2.0
+    centres = -half + (np.arange(cells) + 0.5) * resolution_m  # matches from_origin(-half, half, r, r)
+    gx, gy = np.meshgrid(centres, -centres)
+    sx, sy = to_src.transform(gx.ravel(), gy.ravel())
+    col, row = _apply(~win_transform, np.asarray(sx), np.asarray(sy))
+    coords = np.vstack([row - 0.5, col - 0.5])  # array index of pixel centres
+    if not np.all(np.isfinite(coords)):
+        raise errors.fail(errors.UNSUPPORTED_CRS, "The comparison grid could not be mapped onto the raster.")
+    v = ndimage.map_coordinates(values, coords, order=1, mode="constant", cval=0.0).reshape(cells, cells)
+    w = ndimage.map_coordinates(weight, coords, order=1, mode="constant", cval=0.0).reshape(cells, cells)
+    ok = w >= settings.MIN_CELL_COVERAGE
+    elevation = np.full((cells, cells), np.nan, dtype=np.float64)
+    elevation[ok] = v[ok] / w[ok]
+    ok &= np.isfinite(elevation)
+    elevation[~ok] = np.nan
+    return elevation, ok
+
+
+def _reproject_pair(data, src_transform, src_crs, dst_transform, dst_crs, cells, method):
     elevation = np.full((cells, cells), np.nan, dtype=np.float64)
     reproject(
         source=data,
@@ -305,7 +393,7 @@ def _resample(data, src_transform, src_crs, dst_transform, dst_crs, cells):
         dst_transform=dst_transform,
         dst_crs=dst_crs,
         dst_nodata=np.nan,
-        resampling=Resampling.average,
+        resampling=method,
     )
     coverage = np.zeros((cells, cells), dtype=np.float32)
     reproject(
@@ -318,11 +406,33 @@ def _resample(data, src_transform, src_crs, dst_transform, dst_crs, cells):
         dst_crs=dst_crs,
         dst_nodata=None,
         init_dest_nodata=False,
-        resampling=Resampling.average,
+        resampling=method,
     )
     valid = (coverage >= settings.MIN_CELL_COVERAGE) & np.isfinite(elevation)
     elevation[~valid] = np.nan
     return elevation, valid
+
+
+def _resample(data, src_transform, src_crs, dst_transform, dst_crs, cells, *, source=None, resolution_m=None):
+    """Resample onto the local grid; returns (elevation, valid, sampling label).
+
+    'average': GDAL area averaging (genuine downsampling on an aligned grid).
+    'interpolated': exact area mean over one target cell (normalized box filter
+    on the source grid) sampled bilinearly at the cell centres. At ~1:1 this is
+    plain bilinear interpolation; for downsampling it is an area average that is
+    well defined on rotated grids. Never creates detail finer than the source.
+    """
+    if source is None or resolution_m is None:
+        elevation, valid = _reproject_pair(data, src_transform, src_crs, dst_transform, dst_crs, cells, Resampling.average)
+        return elevation, valid, "average"
+
+    rotation = grid_rotation_deg(source, src_transform, data.shape)
+    if area_average_applicable(source, resolution_m, rotation):
+        elevation, valid = _reproject_pair(data, src_transform, src_crs, dst_transform, dst_crs, cells, Resampling.average)
+        return elevation, valid, "average"
+
+    elevation, valid = _interpolate_area_mean(data, src_transform, source, resolution_m, cells)
+    return elevation, valid, "interpolated"
 
 
 def near_native(source: DemSource, resolution_m: float) -> bool:
@@ -419,15 +529,17 @@ def harmonize(source: DemSource, resolution_m: float, cells: int) -> HarmonizedG
             )
 
     dst_transform = from_origin(-half_side, half_side, resolution_m, resolution_m)
-    elevation, valid = _resample(
+    elevation, valid, sampling = _resample(
         data,
         win_transform,
         rio_crs(source.horizontal_crs),
         dst_transform,
         RioCRS.from_wkt(source.local_crs_wkt),
         cells,
+        source=source,
+        resolution_m=resolution_m,
     )
-    return HarmonizedGrid(elevation_m=elevation, valid=valid, resolution_m=resolution_m, cells=cells)
+    return HarmonizedGrid(elevation_m=elevation, valid=valid, resolution_m=resolution_m, cells=cells, sampling=sampling)
 
 
 def preview_grid(source: DemSource, footprint_m: float) -> HarmonizedGrid:

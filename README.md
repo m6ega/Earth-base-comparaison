@@ -19,7 +19,7 @@ terrain. It is a research prototype, not an operational or decision-making tool.
 
 ## Status
 
-Release candidate on `frontend--dev` (methodology `0.3-proposal`). Tested
+Release candidate on `frontend--dev` (methodology `0.4-proposal`). Tested
 capabilities are listed under [What has been verified](#what-has-been-verified);
 everything in [Limitations and future work](#limitations-and-future-work) is not
 implemented.
@@ -60,10 +60,12 @@ For production deployment (Docker or a plain Python host), see
    metres). Only files that declare no units are read as metres by default; the
    result then carries a visible `VERTICAL_UNITS_ASSUMED` notice.
 3. **Harmonization:** the Earth DEM and the selected reference are resampled to a
-   common ground resolution and an equal central footprint.
+   common ground resolution and an equal central footprint. Genuine downsampling
+   on aligned grids uses area averaging; near-native or rotated grids (such as the
+   polar lunar references) use an interpolated area mean (methodology 0.4).
 4. **Descriptors:** local relief (5 × 5 window), slope in degrees, and surface
    roughness (RMS residual from a local plane, 3 × 3).
-5. **Scoring (methodology 0.3):** each descriptor is summarised by a soft histogram
+5. **Scoring (methodology 0.3, unchanged in 0.4):** each descriptor is summarised by a soft histogram
    (linear assignment between bin centres) and compared with a numerically
    stable base-2 Jensen–Shannon distance; `score = 1 − distance`. The total is the
    unweighted mean of the three scores.
@@ -72,8 +74,9 @@ For production deployment (Docker or a plain Python host), see
    The website shows all of them and highlights condition-specific ones as
    *Scientific notes*.
 
-Full method, thresholds and warning codes: [backend/README.md](backend/README.md)
-and [backend/SCIENTIFIC-FIXES-0.3.md](backend/SCIENTIFIC-FIXES-0.3.md). Every
+Full method, thresholds and warning codes: [backend/README.md](backend/README.md),
+[backend/SCIENTIFIC-FIXES-0.3.md](backend/SCIENTIFIC-FIXES-0.3.md) and
+[backend/SCIENTIFIC-FIXES-0.4.md](backend/SCIENTIFIC-FIXES-0.4.md). Every
 threshold and weight is a documented **proposal**, not a calibrated or validated
 scientific standard.
 

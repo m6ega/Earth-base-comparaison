@@ -6,7 +6,7 @@ Usage:
 Standard library only. Checks: /health, /references (each with a body),
 same-origin frontend delivery and every local asset it references, and a
 real POST /analyze against every registered reference (is_mock=false,
-matching reference id, methodology 0.3 warning present). Exits non-zero on
+matching reference id, soft-histogram scoring warning present). Exits non-zero on
 the first failure. It never fakes or caches a response.
 """
 
@@ -20,7 +20,7 @@ import urllib.request
 import uuid
 from pathlib import Path
 
-METHODOLOGY_MARKER = "SOFT_HISTOGRAM_SCORING"  # emitted by every 0.3 analysis
+METHODOLOGY_MARKER = "SOFT_HISTOGRAM_SCORING"  # emitted by every analysis since 0.3
 
 
 def get(base: str, path: str) -> tuple[int, bytes, str]:

@@ -221,7 +221,7 @@ def analyze(
                  "Resolution and central footprint depend on both inputs. Scores at different physical scales "
                  "must not be directly ranked across references. Even matching scales require calibration."),
         _warning("SOFT_HISTOGRAM_SCORING",
-                 "Methodology 0.3 uses linear assignment between existing bin centers for scoring; "
+                 "Since methodology 0.3, scoring uses linear assignment between existing bin centers; "
                  "the slope chart retains ordinary interval counts. Earlier methodology scores are not directly comparable."),
     ])
     if facts["elevation_scale"] != 1.0 or facts["elevation_offset"] != 0.0:
@@ -248,7 +248,7 @@ def analyze(
                 _warning(
                     "NEAR_NATIVE_INTERPOLATED",
                     f"The {label} could not be sampled pixel-for-pixel at the common resolution "
-                    "and was area-averaged at a ratio near 1:1, which slightly smooths it.",
+                    "and was bilinearly interpolated at a ratio near 1:1, which slightly smooths it.",
                 )
             )
 

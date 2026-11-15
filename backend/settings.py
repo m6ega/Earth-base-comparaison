@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-METHODOLOGY_VERSION = "0.3-proposal"  # decoded elevations; linear soft assignment for scoring
+METHODOLOGY_VERSION = "0.4-proposal"  # 0.3 + artefact-free resampling of rotated / near-native grids
 
 BACKEND_DIR = Path(__file__).resolve().parent
 REFERENCES_DIR = BACKEND_DIR / "references"
@@ -42,6 +42,12 @@ MIN_CELL_COVERAGE = 0.5
 # being area-averaged (which at ~1:1 would blur it). The accepted scale error is
 # this fraction; Gale is 0.45 % east-west (460.97 m spacing in 463.06 m cells).
 ALIGNED_MAX_SCALE_ERROR = 0.01
+# GDAL area averaging is used only for genuine downsampling (>= this many source
+# pixels per cell along the finer axis) on grids within this rotation of the
+# local east/north frame. Otherwise an area-weighted box pre-filter plus
+# bilinear sampling is used (methodology 0.4; see SCIENTIFIC-FIXES-0.4.md).
+AREA_AVERAGE_MIN_RATIO = 2.0
+AREA_AVERAGE_MAX_ROTATION_DEG = 5.0
 # Plausible elevation ranges in metres, used to catch wrong vertical units or
 # undeclared NoData sentinels (for example -32768).
 ELEVATION_RANGE_M = {

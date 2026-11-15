@@ -73,7 +73,7 @@ python backend/smoke_test.py https://YOUR-HOST path/to/earth.tif
 `smoke_test.py` (standard library only) checks health, references and previews,
 the website and every asset it references, and runs a real analysis against
 every reference, asserting `is_mock: false`, the requested `reference_id` and the
-methodology 0.3 warning `SOFT_HISTOGRAM_SCORING`.
+soft-histogram scoring warning `SOFT_HISTOGRAM_SCORING` (methodology ≥ 0.3).
 
 Then open the site and check that the four reference cards load, an analysis
 completes, and the browser console shows no errors.

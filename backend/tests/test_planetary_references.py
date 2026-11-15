@@ -87,9 +87,10 @@ def test_actual_selected_analysis(synthetic_dem,rid):
     assert any(w['code']=='COMPARISON_SCALE' for w in data['warnings'])
     assert {'DESCRIPTOR_SIMILARITY_ONLY','CROSS_REFERENCE_SCALE_CAUTION','SOFT_HISTOGRAM_SCORING'} <= {w['code'] for w in data['warnings']}
     if rid=='mars-gale':
-        # Methodology 0.3 golden value; 0.2 hard assignment was 0.3584422608885516.
-        # Bins/weights were not fitted to this synthetic fixture.
-        assert settings.METHODOLOGY_VERSION=='0.3-proposal'
+        # Golden value, unchanged from 0.3 to 0.4: this fixture's Earth DEM is genuinely
+        # downsampled on an aligned grid (area average) and Gale is sampled pixel-aligned.
+        # 0.2 hard assignment was 0.3584422608885516. Bins/weights were not fitted to it.
+        assert settings.METHODOLOGY_VERSION=='0.4-proposal'
         assert data['total_similarity']==pytest.approx(0.3962021713268066,abs=1e-12)
 
 @pytest.mark.parametrize('rid',['../moon-shackleton','/tmp/evil','MOON','moon-unknown','moon-shackleton/..'])

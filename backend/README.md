@@ -4,9 +4,10 @@ The universal planetary reference engine serves four registered NASA-derived
 references: `mars-gale`, `mars-amazonis`, `moon-mons-mouton` and
 `moon-shackleton`. See [PLANETARY-REFERENCES.md](PLANETARY-REFERENCES.md) for
 registry approval, polar geometry validation and API extensions, and
-[SCIENTIFIC-FIXES-0.3.md](SCIENTIFIC-FIXES-0.3.md) for the methodology 0.3 changes.
+[SCIENTIFIC-FIXES-0.3.md](SCIENTIFIC-FIXES-0.3.md) and
+[SCIENTIFIC-FIXES-0.4.md](SCIENTIFIC-FIXES-0.4.md) for the methodology 0.3 and 0.4 changes.
 
-**Status:** release candidate on `frontend--dev` (methodology `0.3-proposal`). The scientific method below is a **proposal**: [docs/methodology.md](../docs/methodology.md) has not approved any formula, threshold or weight.
+**Status:** release candidate on `frontend--dev` (methodology `0.4-proposal`). The scientific method below is a **proposal**: [docs/methodology.md](../docs/methodology.md) has not approved any formula, threshold or weight.
 
 **Deployment:** the API also serves the static frontend (same origin). See [DEPLOYMENT.md](../DEPLOYMENT.md). Scope and responsibilities: [PROJECT-CONTEXT.md](../PROJECT-CONTEXT.md).
 
@@ -104,7 +105,13 @@ always win, so a file declaring feet is never read as metres.
 
 CORS allows the local Vite (`5173`, `4173`) and Live Server (`5500`) origins on `localhost` and `127.0.0.1`, without credentials. To override, set a comma-separated list before starting the server, for example `$env:TERRA_CORS_ORIGINS = "http://localhost:3000"`. Wildcards are ignored.
 
-## Scientific method (proposal, methodology version `0.3-proposal`)
+## Scientific method (proposal, methodology version `0.4-proposal`)
+
+Version 0.4 changes only resampling of grids that cannot be sampled pixel-aligned:
+GDAL area averaging is kept for genuine (≥ 2×) downsampling on aligned grids; near-native
+or rotated grids (the polar lunar references) use an interpolated area mean, which removes
+the roughness artefact found in 0.3. See [SCIENTIFIC-FIXES-0.4.md](SCIENTIFIC-FIXES-0.4.md).
+Scores from 0.3 and 0.4 must not be compared directly.
 
 See [SCIENTIFIC-FIXES-0.3.md](SCIENTIFIC-FIXES-0.3.md) for the equations,
 controlled evaluation, limitations and integration procedure for this revision.
@@ -134,12 +141,12 @@ An upload is rejected unless all of these hold:
 4. **Footprint:** the largest centred square that fits inside both rasters, `n = floor(2·min(h_earth, h_mars) / r)` cells per side.
    - Both grids are `n × n` cells of `r` metres, so they cover identical ground size and are never stretched.
    - The comparison is rejected if `n < 32` (`INSUFFICIENT_EXTENT`).
-5. **Resampling of a finer DEM:** area-weighted average (GDAL `average`) of valid pixels only. NoData never enters an average. A separate coverage raster marks a cell valid only if valid source pixels cover at least 50% of it.
+5. **Resampling of a finer DEM:** area-weighted average (GDAL `average`) of valid pixels only, when the cell is at least 2× the finer source spacing and the source grid is within 5° of the local east/north frame. Otherwise (near-native ratios or rotated grids) an **interpolated area mean** is used: a normalized box filter spanning one cell, sampled bilinearly at cell centres (methodology 0.4). NoData never enters a mean. A cell is valid only if valid source pixels cover at least 50% of it.
 6. **Sampling of a DEM already at the common resolution** (spacing within 1% of `r` on both axes, `ALIGNED_MAX_SCALE_ERROR`; normally the Mars reference): no averaging.
    - The grid is shifted by less than one cell so that cell centres fall on source pixel centres. Each cell then takes exactly one source pixel, and its NoData mask is the source mask.
-   - It is used only if the mapping is verified to be a one-to-one re-indexing of a contiguous pixel block. Otherwise the DEM is area-averaged and the result carries `NEAR_NATIVE_INTERPOLATED`.
+   - It is used only if the mapping is verified to be a one-to-one re-indexing of a contiguous pixel block. Otherwise the DEM is bilinearly interpolated (since 0.4; GDAL averaging at ~1:1 created artefacts) and the result carries `NEAR_NATIVE_INTERPOLATED`.
    - Why: until version 0.1, averaging at a ~1:1 ratio onto a grid offset from the pixels blended up to 2 × 2 pixels. That smoothed only the coarser DEM. On a synthetic 30 km test, Mars roughness fell by 40%. On Gale, median roughness fell by 20%. The effect depended on whether the cell count was odd or even.
-   - Cost: the 0.45% east–west spacing difference of Gale (460.97 m pixels in 463.06 m cells) is accepted as a scale error. Positional error is at most 160 m (0.34 cell) on the 129-cell grid. Over the full ~99 km Gale extent the drift reaches half a pixel, so that case falls back to averaging.
+   - Cost: the 0.45% east–west spacing difference of Gale (460.97 m pixels in 463.06 m cells) is accepted as a scale error. Positional error is at most 160 m (0.34 cell) on the 129-cell grid. Over the full ~99 km Gale extent the drift reaches half a pixel, so that case falls back to interpolation.
 
 The footprint and resolution are reported in the `COMPARISON_SCALE` warning of each result.
 
