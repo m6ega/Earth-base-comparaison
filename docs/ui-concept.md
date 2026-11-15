@@ -157,6 +157,7 @@ Both maps support zoom in, zoom out, pan/drag while zoomed, and reset view. Thes
 - The overall similarity (`total_similarity`) is displayed prominently.
 - Three secondary cards: Relative Relief, Slope Distribution, Surface Roughness (`scores.*`).
 - The backend returns values from 0 to 1. The frontend displays them as **percentages with one decimal place**: `0.874` → `87.4%`. This rounding is display formatting only.
+  - *Implementation note (release candidate):* the shipped UI shows the value as an index **out of 100** (`87.4 / 100`), not with a `%` sign, next to text stating it is not a probability, confidence or geological equivalence.
 - Do not invent score values.
 - If `is_mock` is `true`, show a clearly visible **DEMO / MOCK DATA** indicator. Mock data must never be presented as real scientific results, and real results must never be presented as simulated.
 - **(proposal)** If a required score is missing, non-numeric or outside 0–1, treat the response as invalid and show an error rather than clamping or substituting a value.

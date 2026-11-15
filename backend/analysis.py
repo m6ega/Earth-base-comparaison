@@ -1,0 +1,384 @@
+
+"""Earth-vs-Mars comparison pipeline, independent of FastAPI.
+
+validate -> plan common footprint -> harmonize both DEMs -> features ->
+Jensen-Shannon similarities -> weighted total -> preview -> contract response.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
+
+import numpy as np
+
+import errors
+import settings
+import similarity
+import terrain_features as tf
+from preprocessing import HarmonizedGrid, harmonize, near_native, plan_common_grid, preview_grid
+from preview import png_data_url
+from reference import PlanetaryReference, load_reference
+from validation import ASSUMED_UNIT_SOURCE, open_earth_dem
+
+METRICS = ("relative_relief", "slope_distribution", "surface_roughness")
+
+
+@dataclass(frozen=True)
+class FeatureSet:
+    histograms: dict[str, tuple[float, ...]]
+    scoring_histograms: dict[str, tuple[float, ...]]
+    samples: dict[str, int]
+    max_relief_m: float
+    sampling: str = "average"
+
+
+def compute_features(grid: HarmonizedGrid, label: str) -> FeatureSet:
+    z, cell = grid.elevation_m, grid.resolution_m
+
+    arrays = {
+        "relative_relief": (
+            tf.local_relief(z, settings.RELIEF_WINDOW_CELLS),
+            settings.RELIEF_BIN_EDGES_M,
+        ),
+        "slope_distribution": (
+            tf.slope_degrees(z, cell),
+            settings.SLOPE_BIN_EDGES_DEG,
+        ),
+        "surface_roughness": (
+            tf.roughness_rms(z, settings.ROUGHNESS_WINDOW_CELLS),
+            settings.ROUGHNESS_BIN_EDGES_M,
+        ),
+    }
+
+    histograms, scoring_histograms, samples = {}, {}, {}
+
+    for name, (values, edges) in arrays.items():
+        fractions, count = tf.histogram_fractions(values, edges)
+
+        if count < settings.MIN_FEATURE_SAMPLES:
+            raise errors.fail(
+                errors.INSUFFICIENT_VALID_DATA,
+                f"Only {count} complete neighbourhoods are available for "
+                f"{name.replace('_', ' ')} in the {label} DEM "
+                f"(minimum {settings.MIN_FEATURE_SAMPLES}). Too much data is missing.",
+            )
+
+        histograms[name] = tuple(float(v) for v in fractions)
+        soft, _ = tf.soft_histogram_fractions(values, edges)
+        scoring_histograms[name] = tuple(float(v) for v in soft)
+        samples[name] = count
+
+    relief = arrays["relative_relief"][0]
+
+    return FeatureSet(
+        histograms=histograms,
+        scoring_histograms=scoring_histograms,
+        samples=samples,
+        max_relief_m=float(np.nanmax(relief)),
+        sampling=grid.sampling,
+    )
+
+
+def mars_features(reference_id, resolution_key, cells, methodology_version):
+    """Compatibility entry point with content-aware invalidation."""
+    ref = load_reference(reference_id)
+    return reference_features(reference_id, resolution_key, cells, methodology_version, ref.fingerprint)
+
+
+@lru_cache(maxsize=32)
+def reference_features(
+    reference_id: str,
+    resolution_key: float,
+    cells: int,
+    methodology_version: str,
+    fingerprint: str,
+) -> FeatureSet:
+    """Cached Mars features, keyed by reference, processing scale and methodology version."""
+
+    ref = load_reference(reference_id)
+    if ref.fingerprint != fingerprint:
+        raise errors.fail(errors.REFERENCE_UNAVAILABLE, "Reference changed during analysis; retry.")
+    grid = harmonize(ref.source, resolution_key, cells)
+
+    if grid.valid_fraction < settings.MIN_VALID_FRACTION:
+        raise errors.fail(
+            errors.PROCESSING_FAILED,
+            "The selected reference has insufficient valid data for this footprint.",
+        )
+
+    return compute_features(grid, "planetary reference")
+
+
+def _warning(code: str, message: str) -> dict:
+    return {"code": code, "message": message}
+
+
+def information_warnings(earth: FeatureSet, reference: FeatureSet) -> list[dict]:
+    result = []
+    for label, features in (("Earth", earth), ("reference", reference)):
+        if features.max_relief_m < settings.FLAT_RELIEF_THRESHOLD_M:
+            result.append(_warning("FLAT_TERRAIN" if label == "Earth" else "REFERENCE_FLAT_TERRAIN",
+                                   f"The {label} window is essentially flat at the comparison scale. "
+                                   "A high score between low-information distributions is not evidence of a terrain analog."))
+        # No arbitrary entropy cutoff: report only exact single-bin degeneracy.
+        degenerate = [name for name, h in features.histograms.items() if np.count_nonzero(h) == 1]
+        if degenerate:
+            result.append(_warning("LOW_INFORMATION_TERRAIN",
+                                   f"The {label} window has single-bin chart distributions for "
+                                   + ", ".join(degenerate) + ". Their discrimination is limited by the bin resolution."))
+    return result
+
+
+def analyze(
+    earth_path: Path,
+    reference_id: str,
+    vertical_unit: str | None = None,
+    vertical_unit_fallback: str | None = None,
+) -> dict:
+    """Analyze an Earth DEM against a registered planetary reference.
+
+    vertical_unit is optional. It is used only when the uploaded DEM
+    does not provide usable elevation-unit metadata. vertical_unit_fallback
+    is applied only when neither metadata nor vertical_unit is available.
+    """
+
+    ref: PlanetaryReference = load_reference(reference_id)
+
+    # Validate the Earth DEM and determine its elevation conversion factor.
+    earth, facts = open_earth_dem(
+        earth_path,
+        vertical_unit=vertical_unit,
+        vertical_unit_fallback=vertical_unit_fallback,
+    )
+
+    resolution, cells = plan_common_grid(earth, ref.source)
+    resolution = round(resolution, 6)  # stable cache key; sub-micrometre change
+
+    earth_grid = harmonize(earth, resolution, cells)
+
+    valid_fraction = earth_grid.valid_fraction
+
+    if valid_fraction < settings.MIN_VALID_FRACTION:
+        raise errors.fail(
+            errors.INSUFFICIENT_VALID_DATA,
+            f"Only {valid_fraction:.0%} of the Earth comparison window has valid elevation data "
+            f"(minimum {settings.MIN_VALID_FRACTION:.0%}).",
+        )
+
+    earth_feat = compute_features(earth_grid, "Earth")
+
+    mars_feat = reference_features(
+        ref.id,
+        resolution,
+        cells,
+        settings.METHODOLOGY_VERSION,
+        ref.fingerprint,
+    )
+
+    try:
+        scores = {
+            metric: similarity.distribution_similarity(
+                earth_feat.scoring_histograms[metric],
+                mars_feat.scoring_histograms[metric],
+            )
+            for metric in METRICS
+        }
+
+        total = similarity.total_similarity(scores)
+
+    except similarity.SimilarityError as exc:
+        raise errors.fail(
+            errors.PROCESSING_FAILED,
+            "The similarity calculation failed a numerical check.",
+        ) from exc
+
+    footprint_km = resolution * cells / 1000.0
+
+    warnings = [
+        _warning(
+            "METHODOLOGY_PROVISIONAL",
+            "Scores use a proposed methodology (version "
+            f"{settings.METHODOLOGY_VERSION}) that is not yet approved or calibrated. "
+            "They describe terrain-geometry similarity only, not habitability or suitability.",
+        ),
+        _warning(
+            "COMPARISON_SCALE",
+            f"Compared central {footprint_km:.1f} km x {footprint_km:.1f} km windows "
+            f"of both DEMs at a common {resolution:.1f} m resolution "
+            f"({cells} x {cells} cells).",
+        ),
+    ]
+
+    warnings.extend([
+        _warning("DESCRIPTOR_SIMILARITY_ONLY",
+                 "Scores compare local descriptor distributions, not geological or morphological equivalence. "
+                 "Hills and depressions can have identical descriptors; a score of 1 is not proof of an analog."),
+        _warning("CROSS_REFERENCE_SCALE_CAUTION",
+                 "Resolution and central footprint depend on both inputs. Scores at different physical scales "
+                 "must not be directly ranked across references. Even matching scales require calibration."),
+        _warning("SOFT_HISTOGRAM_SCORING",
+                 "Since methodology 0.3, scoring uses linear assignment between existing bin centers; "
+                 "the slope chart retains ordinary interval counts. Earlier methodology scores are not directly comparable."),
+    ])
+    if facts["elevation_scale"] != 1.0 or facts["elevation_offset"] != 0.0:
+        warnings.append(_warning("ELEVATION_ENCODING_APPLIED",
+                                 "Earth elevations were decoded as (raw sample * band scale + band offset) "
+                                 "before conversion to metres; raw NoData and masks were preserved."))
+
+    if ref.api_object()["effective_resolution_m"] is None:
+        warnings.append(
+            _warning(
+                "EFFECTIVE_RESOLUTION_UNVERIFIED",
+                f"The {ref.approval.body} reference grid spacing is about {ref.source.native_spacing_m:.0f} m, "
+                "but its effective resolution is not verified as a single comparison scale. "
+                "Gridding and interpolation may smooth terrain; review reference limitations.",
+            )
+        )
+
+    for label, src, feat in (
+        ("Earth DEM", earth, earth_feat),
+        ("selected reference", ref.source, mars_feat),
+    ):
+        if near_native(src, resolution) and feat.sampling != "aligned":
+            warnings.append(
+                _warning(
+                    "NEAR_NATIVE_INTERPOLATED",
+                    f"The {label} could not be sampled pixel-for-pixel at the common resolution "
+                    "and was bilinearly interpolated at a ratio near 1:1, which slightly smooths it.",
+                )
+            )
+
+    e_sp = earth.native_spacing_m
+    m_sp = ref.source.native_spacing_m
+
+    if e_sp < m_sp / 1.5:
+        warnings.append(
+            _warning(
+                "RESOLUTION_REDUCED",
+                f"The Earth DEM was averaged from about {e_sp:.1f} m to "
+                f"{resolution:.1f} m to match the selected reference; finer Earth detail is not used.",
+            )
+        )
+
+    elif e_sp > m_sp * 1.5:
+        warnings.append(
+            _warning(
+                "EARTH_COARSER_THAN_REFERENCE",
+                f"The Earth DEM (about {e_sp:.1f} m) is coarser than the selected reference "
+                f"({m_sp:.1f} m); both were compared at {resolution:.1f} m.",
+            )
+        )
+
+    if earth.half_extent_m < ref.source.half_extent_m - resolution:
+        warnings.append(
+            _warning(
+                "FOOTPRINT_LIMITED_BY_EARTH",
+                "The Earth DEM is smaller than the selected reference, so only the central part "
+                "of the selected reference with the same ground size was compared.",
+            )
+        )
+
+    if valid_fraction < settings.WARN_VALID_FRACTION:
+        warnings.append(
+            _warning(
+                "PARTIAL_COVERAGE",
+                f"{1 - valid_fraction:.1%} of the Earth comparison window has no valid "
+                "elevation data and was excluded.",
+            )
+        )
+
+    if facts["vertical_unit_source"] == ASSUMED_UNIT_SOURCE:
+        warnings.append(
+            _warning(
+                "VERTICAL_UNITS_ASSUMED",
+                "The GeoTIFF declares no elevation units, so its values were interpreted "
+                f"using the requested default ({facts['vertical_to_metres']:g} m per unit). "
+                "If the file actually stores other units, these results are not valid.",
+            )
+        )
+
+    # Report unit conversion accurately, regardless of whether the source
+    # used international feet, US survey feet, or another supported unit.
+    if facts["vertical_to_metres"] != 1.0:
+        warnings.append(
+            _warning(
+                "VERTICAL_UNITS_CONVERTED",
+                "Earth elevations were converted to metres before terrain analysis "
+                f"(unit source: {facts['vertical_unit_source']}).",
+            )
+        )
+
+    warnings.extend(information_warnings(earth_feat, mars_feat))
+
+    warnings.extend(_warning("REFERENCE_LIMITATION", note) for note in ref.api_object()["limitations"])
+    # Check again even on a cached feature hit: never attach stale metadata/results.
+    if load_reference(reference_id).fingerprint != ref.fingerprint:
+        raise errors.fail(errors.REFERENCE_UNAVAILABLE, "Reference changed during analysis; retry.")
+    pv = preview_grid(earth, earth_grid.footprint_m)
+
+    response = {
+        "status": "success",
+        "is_mock": False,
+        "reference": ref.api_object(),
+        "total_similarity": total,
+        "scores": scores,
+        "earth_preview_url": png_data_url(
+            pv.elevation_m,
+            pv.valid,
+            pv.resolution_m,
+        ),
+        "charts": {
+            "slope_distribution": {
+                "unit": "degrees",
+                "bin_edges": [
+                    float(edge)
+                    for edge in settings.SLOPE_BIN_EDGES_DEG
+                ],
+                "earth": list(
+                    earth_feat.histograms["slope_distribution"]
+                ),
+                "reference": list(mars_feat.histograms["slope_distribution"]),
+                "mars": list(
+                    mars_feat.histograms["slope_distribution"]
+                ),
+            }
+        },
+        "warnings": warnings,
+    }
+
+    _assert_json_safe(response)
+
+    return response
+
+
+def _assert_json_safe(response: dict) -> None:
+    """Refuse to return NaN/Infinity or out-of-range scores."""
+
+    try:
+        json.dumps(response, allow_nan=False)
+
+    except ValueError as exc:
+        raise errors.fail(
+            errors.PROCESSING_FAILED,
+            "The analysis produced a non-finite value.",
+        ) from exc
+
+    values = [
+        response["total_similarity"],
+        *response["scores"].values(),
+    ]
+
+    if not all(
+        isinstance(value, float)
+        and math.isfinite(value)
+        and 0.0 <= value <= 1.0
+        for value in values
+    ):
+        raise errors.fail(
+            errors.PROCESSING_FAILED,
+            "The analysis produced an out-of-range score.",
+        )

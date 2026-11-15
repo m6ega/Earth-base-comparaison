@@ -1,0 +1,12 @@
+{
+  "mars": {
+    "name": "Mars",
+    "semi_major_m": 3396000.0,
+    "semi_minor_m": 3396000.0
+  },
+  "moon": {
+    "name": "Moon",
+    "semi_major_m": 1737400.0,
+    "semi_minor_m": 1737400.0
+  }
+}

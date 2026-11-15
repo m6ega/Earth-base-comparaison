@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "reference_id": "moon-mons-mouton",
+  "enabled": true,
+  "approved": true,
+  "body": "moon",
+  "name": "Mons Mouton",
+  "category": "mountain",
+  "description": "LOLA Mons Mouton adjusted DEM (100 km centred subset)",
+  "effective_resolution_m": null,
+  "effective_resolution_evidence": null,
+  "sha256": {
+    "dem.tif": "33cbeeb9278db1ff8d05484ca091b68eeea5c6da48af22a5ad298dc5817c721b",
+    "metadata.json": "968499f691512cc66b071f8f0ea53e58063326dc2594668ef8f608cd1d06a544",
+    "preview.png": "25a1db5dc8bf77a988b2f4f660bd91c4209ee0c4f79eb7f6ecc336467e1bf183"
+  },
+  "limitations": [
+    "100 km square projected crop centred on the IAU Mons Mouton position (-84.60, +31.00); covers a subset and surroundings, not the complete 130 km named feature.",
+    "Source frame: MOON_ME of JPL DE421; projected lunar sphere radius 1737400 m. Elevations are metres above the lunar reference sphere, not a terrestrial or Mars datum.",
+    "80 m is projected grid spacing, not effective terrain resolution. Crop EFFRES statistics: {\"minimum_m\": 7.188395023345947, \"maximum_m\": 300.5499267578125, \"median_m\": 23.834197998046875}",
+    "EFFRES is effective spatial resolution in metres, not elevation, vertical error or a void mask. It was inspected but not merged into the DEM.",
+    "Adjusted DEM is an existing gridded product; upstream interpolation may be present. No observation/count mask was provided. No additional gap filling or interpolation was performed here.",
+    "Legacy ldem_80s_80m.jp2 is an older elevation product, int16 with height scaling 0.5 m/DN per official PDS label; Rasterio alone reports scale 1 because the detached label is absent. Not used to fill or combine with adjusted elevations."
+  ]
+}

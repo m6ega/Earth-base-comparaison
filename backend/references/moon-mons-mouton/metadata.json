@@ -1,0 +1,66 @@
+{
+  "dataset": "LOLA Mons Mouton adjusted DEM (100 km centred subset)",
+  "source": "NASA LRO LOLA adjusted south polar DEM, PGDA product 90",
+  "source_file": "LDEM_80S_80MPP_ADJ.tiff",
+  "source_label": "https://pgda.gsfc.nasa.gov/products/90",
+  "planet": "Moon",
+  "region": "Mons Mouton",
+  "center": {
+    "latitude_planetocentric": -84.60080674601822,
+    "longitude_positive_east": 30.973352207668466
+  },
+  "elevation": {
+    "unit": "metres",
+    "reference": "Lunar reference sphere, radius 1737400 m",
+    "minimum": -2024.782470703125,
+    "maximum": 7026.3310546875,
+    "mean": 2703.0890205200176,
+    "source_data_type": "32-bit floating point",
+    "byte_order": "Little-endian",
+    "scale_factor": 1
+  },
+  "raster": {
+    "width": 1250,
+    "height": 1250,
+    "resolution_metres": [
+      80.0,
+      80.0
+    ],
+    "crop_size_requested_km": 100,
+    "nodata": -3.4028234663852886e+38,
+    "valid_pixels": 1562500,
+    "nodata_pixels": 0
+  },
+  "coordinate_system": {
+    "projection": "Moon south polar stereographic",
+    "central_meridian_degrees": 0,
+    "mars_radius_metres": null,
+    "crs_wkt": "PROJCS[\"Moon (2015) - Sphere / Ocentric / South Polar\",GEOGCS[\"Moon (2015) - Sphere / Ocentric\",DATUM[\"Moon (2015) - Sphere\",SPHEROID[\"Moon (2015) - Sphere\",1737400,0,AUTHORITY[\"IAU\",\"30100\"]],AUTHORITY[\"IAU\",\"30100\"]],PRIMEM[\"Reference Meridian\",0,AUTHORITY[\"IAU\",\"30100\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"IAU\",\"30100\"]],PROJECTION[\"Polar_Stereographic\"],PARAMETER[\"latitude_of_origin\",-90],PARAMETER[\"central_meridian\",0],PARAMETER[\"false_easting\",0],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",NORTH],AXIS[\"Northing\",NORTH],AUTHORITY[\"IAU\",\"30135\"]]"
+  },
+  "processing": [
+    "Selected adjusted float32 DEM instead of legacy half-metre JP2; EFFRES used only for quality assessment.",
+    "Transformed IAU centre to source CRS; extracted integer pixel window col=4229, row=1419, width=1250, height=1250.",
+    "No merging, reprojection, resampling, scaling or interpolation of output DEM. Valid source float32 elevations preserved exactly.",
+    "Source NoData is NaN. Invalid/masked samples mapped to finite float32 minimum sentinel for strict JSON-compatible metadata; valid zeros preserved.",
+    "Exported losslessly DEFLATE-compressed GeoTIFF with original lunar CRS/affine transform and explicit metre band units.",
+    "Preview uses existing backend render_rgba/encode_png on actual crop: 2nd-98th percentile display stretch, terrain colours, 315 degree azimuth/45 degree altitude hillshade; invalid samples transparent. 1250 x 1250 PNG; no map interpolation. Unlike Gale annotated matplotlib preview, plain raster uses the installed backend renderer without adding dependencies."
+  ],
+  "data_quality_notes": [
+    "100 km square projected crop centred on the IAU Mons Mouton position (-84.60, +31.00); covers a subset and surroundings, not the complete 130 km named feature.",
+    "Position authority: https://planetarynames.wr.usgs.gov/Feature/16070 . Sphere makes planetographic and planetocentric latitude equal.",
+    "Product documentation: https://pgda.gsfc.nasa.gov/products/90 ; Barker et al. 2023, doi:10.3847/PSJ/acf3e1; data doi:10.60903/gsfcpgda-lola-spole.",
+    "Source frame: MOON_ME of JPL DE421; projected lunar sphere radius 1737400 m. Elevations are metres above the lunar reference sphere, not a terrestrial or Mars datum.",
+    "Original source grid is 7600 x 7600, 80 m projected spacing, bounds [-304000.0, -304000.0, 304000.0, 304000.0] m. Nominal product is south of 80 S; square corners extend to lower latitudes. Crop is within source coverage.",
+    "Output projected bounds [left,bottom,right,top] metres: [34320.0, 90480.0, 134320.0, 190480.0]",
+    "Output geographic envelope [west,south,east,north] degrees, positive east (densified perimeter): [10.213763011201843, -86.80954438786723, 56.03519115151084, -82.32513765701721]",
+    "80 m is projected grid spacing, not effective terrain resolution. Crop EFFRES statistics: {\"minimum_m\": 7.188395023345947, \"maximum_m\": 300.5499267578125, \"median_m\": 23.834197998046875}",
+    "EFFRES is effective spatial resolution in metres, not elevation, vertical error or a void mask. It was inspected but not merged into the DEM.",
+    "Adjusted DEM is an existing gridded product; upstream interpolation may be present. No observation/count mask was provided. No additional gap filling or interpolation was performed here.",
+    "Legacy ldem_80s_80m.jp2 is an older elevation product, int16 with height scaling 0.5 m/DN per official PDS label; Rasterio alone reports scale 1 because the detached label is absent. Not used to fill or combine with adjusted elevations.",
+    "Legacy label: https://imbrium.mit.edu/DATA/LOLA_GDR/POLAR/JP2/LDEM_80S_80M_JP2.LBL .",
+    "Schema compatibility limitation: coordinate_system.mars_radius_metres is null (not applicable to Moon); true lunar radius is in crs_wkt and these notes. All Mars metadata field names/nesting retained; no false Mars radius supplied.",
+    "Pipeline integration blocked: reference registry is Mars-only, loader enforces Mars radius, and ELEVATION_RANGE_M has no moon key. No pipeline changes made.",
+    "Source file SHA256 values: {\"LDEM_80S_80MPP_ADJ.tiff\": \"82030dcbdd7c4bb0c7d858e9b4b293b9f2cda5a543ba31ec0f42784bd6beee5a\", \"LDEM_80S_80MPP_ADJ_EFFRES.tiff\": \"7e973835104343f7c10e868e73ca1b0a506879d3eabe8c17c56ed6774a493400\", \"ldem_80s_80m.jp2\": \"c088dd4f510e879375ee7e6f0d320ba84115f535f45fb592dd7f83a7d2e83ae3\"}",
+    "No detached label supplied for adjusted GeoTIFF; source_label points to the authoritative product documentation instead."
+  ]
+}

@@ -1,0 +1,16 @@
+# Planetary reference assets are integrity-checked byte-for-byte: every
+# registration.json pins SHA-256 hashes of dem.tif, metadata.json and
+# preview.png. Git must never rewrite their line endings (core.autocrlf or
+# text=auto would change metadata.json bytes on Linux/macOS checkouts and the
+# registry would reject the reference). Store and check out exactly as approved.
+backend/references/** -text
+
+# Binary rasters and images
+*.tif binary
+*.tiff binary
+*.png binary
+*.jpg binary
+
+# Files executed inside Linux containers must keep LF endings everywhere.
+Dockerfile text eol=lf
+*.sh text eol=lf

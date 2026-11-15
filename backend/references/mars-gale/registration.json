@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "reference_id": "mars-gale",
+  "enabled": true,
+  "approved": true,
+  "body": "mars",
+  "name": "Gale Crater",
+  "category": "crater",
+  "description": "MOLA Gale Crater DEM",
+  "effective_resolution_m": null,
+  "effective_resolution_evidence": null,
+  "sha256": {
+    "dem.tif": "11a7695c8ca7b4e66735ef051459b2305fb43ee52add4923095485ce81370256",
+    "metadata.json": "265b91b6a3dd2c6478dd98718fc9ce725e290df3020420ae66787cdbbd7fe62a",
+    "preview.png": "919e92f921b9791825a3299193b8b21d381fcd8fa3cdbbaca8a9eefbdd751be8"
+  },
+  "limitations": [
+    "NASA describes the grid values as median observed topography, with interpolated values supplied where observations are absent.",
+    "Zero values are treated as NoData according to the ENVI header.",
+    "The source does not provide a separate per-pixel observation mask."
+  ]
+}

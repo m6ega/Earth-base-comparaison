@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "reference_id": "moon-shackleton",
+  "enabled": true,
+  "approved": true,
+  "body": "moon",
+  "name": "Shackleton Crater",
+  "category": "crater",
+  "description": "LOLA adjusted south polar DEM",
+  "effective_resolution_m": null,
+  "effective_resolution_evidence": null,
+  "sha256": {
+    "dem.tif": "cdd0f0a65ca2e6c5acf1eae087f8876376c789604b06a652c8d59226de2dd465",
+    "metadata.json": "3ae7a1124a54fcfe92421da4f072e180a4331f8d5f66a3bbc41ff005a2484890",
+    "preview.png": "2c6b5f81d9982433615f073ba183cd301d27021a8377d3b9b7723863cdb38887"
+  },
+  "limitations": [
+    "80 m projected spacing is not effective resolution; see auxiliary EFFRES statistics.",
+    "Upstream DEM gridding/interpolation is inherited; no observation mask supplied.",
+    "Crop includes the south pole; longitude wraps and is undefined at the pole. Use projected bounds and CRS rather than a naive geographic rectangle."
+  ]
+}

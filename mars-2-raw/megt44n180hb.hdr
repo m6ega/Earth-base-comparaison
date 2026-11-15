@@ -1,0 +1,10 @@
+ENVI
+description = {Generated companion header for NASA MOLA MEGT44N180HB IMG. Values transcribed from the official PDS3 label. Not the original NASA ENVI header. Georeferencing must be read from the PDS label, not assumed from this minimal header.}
+samples = 11520
+lines = 5632
+bands = 1
+header offset = 0
+file type = ENVI Standard
+data type = 2
+interleave = bsq
+byte order = 1

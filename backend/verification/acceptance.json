@@ -1,0 +1,100 @@
+{
+  "earth_file": "backend/synthetic_earth.tif",
+  "earth_data_kind": "synthetic, not observational",
+  "earth_sha256": "112c3a54efc9832f4ff08d8c1bb724706e98b2d62e7517339668257339e3e60a",
+  "http_base": "http://127.0.0.1:8001",
+  "results": [
+    {
+      "id": "mars-gale",
+      "http_status": 200,
+      "is_mock": false,
+      "dem_path": "backend\\references\\mars-gale\\dem.tif",
+      "dem_sha256": "11a7695c8ca7b4e66735ef051459b2305fb43ee52add4923095485ce81370256",
+      "version": "bb79707ab47bb70e6db98e5358a60caf1e43bcbe83534d4fbff5d1610ba1f2b2",
+      "preview_url": "/static/references/mars-gale/preview.png",
+      "total_similarity": 0.3584422608885516,
+      "scores": {
+        "relative_relief": 0.3401986696870791,
+        "slope_distribution": 0.4705481051058492,
+        "surface_roughness": 0.2645800078727265
+      },
+      "grid_cells": 129,
+      "common_resolution_m": 463.057667,
+      "earth_footprint_m": 59734.439043,
+      "reference_footprint_m": 59734.439043,
+      "warning_codes": [
+        "METHODOLOGY_PROVISIONAL",
+        "COMPARISON_SCALE",
+        "EFFECTIVE_RESOLUTION_UNVERIFIED",
+        "RESOLUTION_REDUCED",
+        "FOOTPRINT_LIMITED_BY_EARTH",
+        "REFERENCE_LIMITATION",
+        "REFERENCE_LIMITATION",
+        "REFERENCE_LIMITATION"
+      ]
+    },
+    {
+      "id": "moon-mons-mouton",
+      "http_status": 200,
+      "is_mock": false,
+      "dem_path": "backend\\references\\moon-mons-mouton\\dem.tif",
+      "dem_sha256": "33cbeeb9278db1ff8d05484ca091b68eeea5c6da48af22a5ad298dc5817c721b",
+      "version": "9b77d0aaf37eb4bc870c21418a6e62535ae3f910278e2f6a3a096ae478a158f2",
+      "preview_url": "/static/references/moon-mons-mouton/preview.png",
+      "total_similarity": 0.3447038239995108,
+      "scores": {
+        "relative_relief": 0.43484442127609557,
+        "slope_distribution": 0.4132204986742597,
+        "surface_roughness": 0.18604655204817722
+      },
+      "grid_cells": 748,
+      "common_resolution_m": 79.822606,
+      "earth_footprint_m": 59707.309288,
+      "reference_footprint_m": 59707.309288,
+      "warning_codes": [
+        "METHODOLOGY_PROVISIONAL",
+        "COMPARISON_SCALE",
+        "EFFECTIVE_RESOLUTION_UNVERIFIED",
+        "NEAR_NATIVE_INTERPOLATED",
+        "RESOLUTION_REDUCED",
+        "FOOTPRINT_LIMITED_BY_EARTH",
+        "REFERENCE_LIMITATION",
+        "REFERENCE_LIMITATION",
+        "REFERENCE_LIMITATION",
+        "REFERENCE_LIMITATION",
+        "REFERENCE_LIMITATION",
+        "REFERENCE_LIMITATION"
+      ]
+    },
+    {
+      "id": "moon-shackleton",
+      "http_status": 200,
+      "is_mock": false,
+      "dem_path": "backend\\references\\moon-shackleton\\dem.tif",
+      "dem_sha256": "cdd0f0a65ca2e6c5acf1eae087f8876376c789604b06a652c8d59226de2dd465",
+      "version": "47be0eff6f0f51bddd526fd84f3aa686320920fb40e855300e3ecef65c213a8f",
+      "preview_url": "/static/references/moon-shackleton/preview.png",
+      "total_similarity": 0.19009591860506403,
+      "scores": {
+        "relative_relief": 0.25235303390871666,
+        "slope_distribution": 0.25795465379281834,
+        "surface_roughness": 0.05998006811365708
+      },
+      "grid_cells": 355,
+      "common_resolution_m": 79.999334,
+      "earth_footprint_m": 28399.763570000003,
+      "reference_footprint_m": 28399.763570000003,
+      "warning_codes": [
+        "METHODOLOGY_PROVISIONAL",
+        "COMPARISON_SCALE",
+        "EFFECTIVE_RESOLUTION_UNVERIFIED",
+        "NEAR_NATIVE_INTERPOLATED",
+        "RESOLUTION_REDUCED",
+        "REFERENCE_LIMITATION",
+        "REFERENCE_LIMITATION",
+        "REFERENCE_LIMITATION"
+      ]
+    }
+  ],
+  "unsafe_id_status": 400
+}

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "reference_id": "mars-amazonis",
+  "enabled": true,
+  "approved": true,
+  "body": "mars",
+  "name": "Amazonis Planitia",
+  "category": "Smooth volcanic plains",
+  "description": "Approximately 100 km sample of low-relief Amazonis plains near 19 N, 203 E.",
+  "effective_resolution_m": null,
+  "effective_resolution_evidence": null,
+  "sha256": {
+    "dem.tif": "e4a7992d81b1f1d5012d0749f875e4f0cc19f6a28988e7dad22c71157acc30f6",
+    "metadata.json": "bd8989bf00d697a1250c0ddf4853230c92e7942571a3ae7e9498e88f577be022",
+    "preview.png": "ce4d04d6ad6ad943097b75048f573e4280f68b315e081cff2c177e7ef7927507"
+  },
+  "limitations": [
+    "Native MOLA MEGDR topography includes upstream interpolation where no MOLA shots exist; no per-cell observation mask is supplied.",
+    "128 pixels per degree (about 463 m) is grid spacing, not verified effective resolution.",
+    "Equirectangular grid: east-west ground spacing at the 19 N centre is about 438 m versus 463 m north-south.",
+    "Deliberately low-relief smooth-plains sample (about 178 m of relief across about 100 km); flat or low-information terrain cautions are expected and similarity is descriptor-only.",
+    "Extraction used a local PDS3 label copy and a generated ENVI companion header; the crop was verified pixel-exactly against the local MEGT44N180HB.IMG (MEGDR v2.0), whose SHA-256 is recorded in metadata.json."
+  ]
+}
