@@ -76,7 +76,7 @@ def main() -> None:
     status, html, ctype = get(base, "/")
     check(status == 200 and "text/html" in ctype, "frontend served at /")
     page = html.decode("utf-8", "replace")
-    assets = set(re.findall(r'(?:src|href)="(?!https?:|#|data:)([^"]+)"', page))
+    assets = set(re.findall(r'(?:src|href)="(?![a-zA-Z][a-zA-Z0-9+.-]*:|#)([^"]+)"', page))
     css_status, css, _ = get(base, "/style.css")
     assets |= {u.strip("'\"") for u in re.findall(r"url\(([^)]+)\)", css.decode("utf-8", "replace"))
                if not u.strip("'\"").startswith(("http", "data:", "#"))}

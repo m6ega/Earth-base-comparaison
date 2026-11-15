@@ -629,20 +629,69 @@
     </main>
 
     <footer class="site-footer">
-        <div class="container site-footer__inner">
+        <div class="container">
 
-            <div class="site-footer__brand">
-                <svg class="brand__mark brand__mark--sm" aria-hidden="true"><use href="#ta-star"/></svg>
-                <span><strong>Terra Analog</strong> · Planetary Terrain Analysis</span>
+            <div class="site-footer__grid">
+
+                <section class="site-footer__col site-footer__col--brand" aria-labelledby="footerAboutTitle">
+                    <h2 class="sr-only" id="footerAboutTitle">About this project</h2>
+                    <div class="site-footer__brand">
+                        <svg class="brand__mark brand__mark--sm" aria-hidden="true"><use href="#ta-star"/></svg>
+                        <span><strong>Terra Analog</strong> · Planetary Terrain Analysis</span>
+                    </div>
+                    <p class="site-footer__credit">
+                        Created by <strong>Yusuf Shukhratkhon</strong> and <strong>Azim Abdullaev</strong>
+                        for the NASA Space Apps Challenge 2026.
+                    </p>
+                </section>
+
+                <section class="site-footer__col" aria-labelledby="footerContactTitle">
+                    <h2 class="site-footer__heading" id="footerContactTitle">Contact the creators</h2>
+                    <ul class="site-footer__list">
+                        <li>
+                            <span class="site-footer__who">Yusuf Shukhratkhon</span>
+                            <a class="site-footer__link" href="mailto:levithegreatxx@gmail.com">levithegreatxx@gmail.com</a>
+                        </li>
+                        <li>
+                            <span class="site-footer__who">Azim Abdullaev</span>
+                            <a class="site-footer__link" href="mailto:azimthv@gmail.com">azimthv@gmail.com</a>
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="site-footer__col site-footer__col--data" aria-labelledby="footerDataTitle">
+                    <h2 class="site-footer__heading" id="footerDataTitle">Data &amp; attribution</h2>
+                    <ul class="site-footer__list">
+                        <li>
+                            <span class="site-footer__who">Mars · Gale Crater, Amazonis Planitia</span>
+                            <span>NASA MGS MOLA gridded topography (MEGDR, 128 pixels per degree),
+                                <a class="site-footer__link" href="https://pds-geosciences.wustl.edu/missions/mgs/megdr.html" target="_blank" rel="noopener noreferrer">NASA PDS Geosciences Node<span class="sr-only"> (opens in a new tab)</span></a></span>
+                        </li>
+                        <li>
+                            <span class="site-footer__who">Moon · Mons Mouton, Shackleton Crater</span>
+                            <span>NASA LRO LOLA south-polar DEM (LDEM_80S_80MPP_ADJ),
+                                <a class="site-footer__link" href="https://pgda.gsfc.nasa.gov/products/90" target="_blank" rel="noopener noreferrer">NASA GSFC PGDA product 90<span class="sr-only"> (opens in a new tab)</span></a></span>
+                        </li>
+                        <li>
+                            <span class="site-footer__who">Earth</span>
+                            <span>Elevation models are uploaded by each user; their source and licence are not verified by Terra Analog.</span>
+                        </li>
+                    </ul>
+                </section>
+
             </div>
 
-            <p class="site-footer__note">
-                Research prototype. Similarity describes terrain geometry only.
-            </p>
+            <div class="site-footer__bar">
+                <p class="site-footer__note">
+                    Similarity scores are experimental indicators for exploratory comparison of terrain geometry,
+                    not validated measures of geological equivalence or mission suitability.
+                    Developed during the NASA Space Apps Challenge 2026; not endorsed by NASA.
+                </p>
 
-            <button type="button" class="link-button" id="aboutBtn">
-                About Terra Analog
-            </button>
+                <button type="button" class="link-button" id="aboutBtn">
+                    About Terra Analog
+                </button>
+            </div>
 
         </div>
     </footer>

@@ -25,7 +25,7 @@ def test_every_local_asset_referenced_by_the_frontend_exists():
     """Guards against broken asset references (e.g. images never committed)."""
     html = (settings.FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
     css = (settings.FRONTEND_DIR / "style.css").read_text(encoding="utf-8")
-    refs = set(re.findall(r'(?:src|href)="(?!https?:|#|data:)([^"]+)"', html))
+    refs = set(re.findall(r'(?:src|href)="(?![a-zA-Z][a-zA-Z0-9+.-]*:|#)([^"]+)"', html))
     refs |= {m.strip("'\"") for m in re.findall(r"url\(([^)]+)\)", css) if not m.strip("'\"").startswith(("http", "data:", "#"))}
     assert refs, "no local assets found"
     for ref in sorted(refs):
